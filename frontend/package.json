@@ -10,7 +10,8 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "test": "vitest run",
-    "coverage": "vitest run --coverage"
+    "coverage": "vitest run --coverage",
+    "test:smoke": "node scripts/browser-smoke.mjs"
   },
   "dependencies": {
     "react": "^19.1.1",
@@ -24,6 +25,7 @@
     "@vitejs/plugin-react": "^5.0.2",
     "@vitest/coverage-v8": "^4.0.0",
     "jsdom": "^26.1.0",
+    "playwright-core": "1.61.1",
     "typescript": "~5.9.2",
     "vite": "^7.1.4",
     "vitest": "^4.0.0"

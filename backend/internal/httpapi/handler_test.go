@@ -136,11 +136,16 @@ func checkResponse(t *testing.T, recorder *httptest.ResponseRecorder, status int
 func checkError(t *testing.T, recorder *httptest.ResponseRecorder, status int, code string) {
 	t.Helper()
 	checkResponse(t, recorder, status)
-	var body errorResponse
+	var body map[string]any
 	if err := json.Unmarshal(recorder.Body.Bytes(), &body); err != nil {
 		t.Fatalf("decode error response: %v", err)
 	}
-	if body.Error.Code != code || body.Error.Message == "" {
-		t.Fatalf("error = %+v; want %s and a message", body.Error, code)
+	details, ok := body["error"].(map[string]any)
+	if !ok {
+		t.Fatalf("response = %+v; want an error object", body)
+	}
+	message, ok := details["message"].(string)
+	if details["code"] != code || !ok || strings.TrimSpace(message) == "" {
+		t.Fatalf("error = %+v; want code %q and a non-empty message", details, code)
 	}
 }

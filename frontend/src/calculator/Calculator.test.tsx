@@ -120,8 +120,13 @@ describe('addition calculator', () => {
 
   it('activates a keypad button with native keyboard focus', async () => {
     const { user, value } = openCalculator()
-    for (let tab = 0; tab < 9; tab++) await user.tab()
-    expect(document.activeElement).toBe(screen.getByRole('button', { name: '7' }))
+    const seven = screen.getByRole('button', { name: '7' })
+    const visited = new Set<Element | null>()
+    while (document.activeElement !== seven && !visited.has(document.activeElement)) {
+      visited.add(document.activeElement)
+      await user.tab()
+    }
+    expect(document.activeElement).toBe(seven)
     await user.keyboard('{Enter}')
     expect(value()).toBe('7')
   })
@@ -195,6 +200,26 @@ describe('addition calculator', () => {
     await waitFor(() => expect(value()).toBe('5'))
     expect(requestBody(0)).toEqual(requestBody(1))
     expect(requestBody(1)).toEqual(requestBody(2))
+  })
+
+  it('preserves the calculation and allows retry after an HTML 502 response', async () => {
+    fetchMock
+      .mockResolvedValueOnce(new Response('<html><body>Bad Gateway</body></html>', {
+        status: 502,
+        headers: { 'Content-Type': 'text/html' },
+      }))
+      .mockResolvedValueOnce(reply(11))
+    const { user, value } = openCalculator()
+
+    await user.keyboard('7+4=')
+    expect((await screen.findByRole('alert')).textContent).toContain('invalid response')
+    expect(screen.getByText('7 +')).toBeTruthy()
+    expect(value()).toBe('4')
+
+    await user.keyboard('=')
+    expect(requestBody(1)).toEqual({ operation: 'add', a: 7, b: 4 })
+    await waitFor(() => expect(value()).toBe('11'))
+    expect(screen.queryByRole('alert')).toBeNull()
   })
 })
 

@@ -53,6 +53,17 @@ go test -coverpkg=./... -coverprofile=coverage.out ./...
 go tool cover -func=coverage.out
 ```
 
+## Browser smoke test
+
+Start the Go API and Vite using the [local setup commands](#run-locally). Then run these commands in another terminal from `frontend/`.
+
+```sh
+npx playwright-core install --only-shell chromium
+npm run test:smoke
+```
+
+The script drives Chromium through the running React app and checks the real Go responses for `1 ÷ 3 × 3 = 1` and correction of `8 ÷ 0` to `8 ÷ 2 = 4`. It uses `http://127.0.0.1:5173` by default. If Vite uses another port, pass its URL with `npm run test:smoke -- http://127.0.0.1:5174`. On Linux, `npx playwright-core install --with-deps --only-shell chromium` also installs the browser's system dependencies.
+
 ## Design
 
 - React owns the calculator interaction. A pure reducer manages input and transitions. The hook issues requests through native `fetch`; Clear aborts the request and invalidates any response that still arrives.

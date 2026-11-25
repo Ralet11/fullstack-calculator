@@ -297,3 +297,137 @@ Tool — Codex (ChatGPT). Purpose — implement and verify the remaining standar
 - `go vet ./...` and `go build -o ../.tooling/calculator-api-standard.exe .` passed. Windows Code Integrity blocked direct launch of the output file. `go run .` started the Windows Go API on loopback.
 - `npm.cmd run coverage` passed all 25 frontend tests. Calculator coverage was 94.40% of statements, 96.52% of lines, and 91.04% of branches. `npm.cmd run build` passed the TypeScript check and Vite production build.
 - `node .tooling/browser-standard-smoke.mjs` passed in headless Chrome with Vite proxying to the running Go API. It verified keyboard input, touch input at 320 CSS pixels, `10 + 5 × 2 = 30`, operator replacement, and correction of `8 ÷ 0` to `8 ÷ 2 = 4`. It captured the full quotient in the multiplication request for `1 ÷ 3 × 3` and checked the displayed rounded quotient. Live HTTP checks verified both zero signs return `DIVISION_BY_ZERO`, invalid requests return 400, and overflow in both operations returns `NON_FINITE_RESULT`.
+
+## 2026-11-24 — Standard-operation test strategy review
+
+Tool — Codex (ChatGPT). Purpose — assess the current tests and backend CI before starting advanced operations.
+
+### Prompt
+
+> Now that the four standard operations are implemented I want to review and consolidate our testing strategy before moving forward
+>
+> Review ASSESSMENT.md, SPEC.md, AGENTS.md and the current frontend and backend tests
+>
+> Check that we're properly covering arithmetic, HTTP contracts, calculator state, async behavior, error recovery, precision and mixed operations
+>
+> Identify weak assertions, missing edge cases, tests that depend too much on implementation details and anything that could become difficult to maintain
+>
+> I also want GitHub Actions on Ubuntu to be our main backend CI verification, with tests, coverage, go vet and build. Check what we currently have and what needs to be configured
+> Suggest a small set of improvements, prioritizing correctness and reproducibility without overengineering
+>
+> For now dont implement anything, first give me your assessment and the changes you recommend so we can agree on them
+
+### Decisions from Ramiro
+
+- Use GitHub Actions on Ubuntu as the primary backend verification. Include tests, coverage, vet, and a build.
+- Review the strategy and agree on improvements before implementing them.
+
+### Outcome and checks
+
+- Reviewed the assessment, specification, project guidelines, Go arithmetic and HTTP tests, React behavior tests, API client, and test configuration in the new repository. The existing layers cover the standard operations, including full-precision chaining, stale responses, and error recovery.
+- Verified through Git that GitHub main matched the local initial commit `c55e64c`. That tree contains no GitHub Actions workflow or checked-in browser smoke script. Tests were not rerun during this review.
+- Pending recommendations are one Ubuntu backend workflow, an HTTP error-schema assertion independent of the production type, less brittle keyboard focus coverage, one non-JSON response recovery case, and a short reproducible real-stack smoke check. Flagged unary operand validation, percentage edge cases, and mode switching during a pending request for the advanced milestone.
+- Only this log was updated. Implementation and test changes await agreement.
+
+## 2026-11-24 — Ubuntu backend CI baseline
+
+Tool — Codex (ChatGPT). Purpose — establish the first repeatable backend CI run for the four standard operations.
+
+### Prompt
+
+> I agree with the testing review, lets start by establishing the backend CI baseline
+> Implement the minimal GitHub Actions workflow on Ubuntu using the Go version from backend/go.mod
+> Run the complete backend test suite with coverage, print the coverage summary, run go vet and build the API
+
+### Follow-up
+
+> Yes, push a CI branch and open a draft PR
+
+### Decisions and outcome
+
+- Ramiro approved the Ubuntu CI baseline from the standard-operation test strategy review and authorized publication on a CI branch with a draft pull request.
+- Added one backend workflow triggered by pull requests and pushes to `main`. It runs from `backend/`, reads the Go version from `backend/go.mod`, and keeps read-only repository permissions.
+- Pushed commit `5b7be58` to `ci/backend-baseline` and opened [draft PR #1](https://github.com/Ralet11/fullstack-calculator/pull/1). The workflow commit contains only `.github/workflows/backend.yml`. The review and CI notes in this log are local.
+
+### Checks run
+
+- On GitHub-hosted Ubuntu with Go 1.25.0 for Linux AMD64, `go test -count=1 -coverpkg=./... -coverprofile=coverage.out ./...` passed both backend test packages. `go tool cover -func=coverage.out` printed 93.0% overall statement coverage. `go vet ./...` and `go build -o calculator-api .` also passed. [GitHub Actions run](https://github.com/Ralet11/fullstack-calculator/actions/runs/45533516701)
+- Repeated the tests, coverage summary, vet, and build locally with Go 1.25.0 for Windows AMD64. All passed, with 93.0% overall statement coverage. The local build output was placed in the ignored `.tooling` directory.
+
+## 2026-11-24 — Finalize backend CI baseline
+
+Tool — Codex (ChatGPT). Purpose — review and merge the backend CI workflow and verify it on main.
+
+### Prompt
+
+> The first GitHub Actions run passed successfully, I want to finalize the backend CI baseline
+>
+> Review PR #1 and confirm that the workflow is minimal and correctly configured
+>
+> If everything looks good, mark the PR ready for review and merge it into main
+
+### Decisions and outcome
+
+- Ramiro authorized marking PR #1 ready and merging it into `main` after a successful review.
+- Reviewed the single workflow change and its passing PR run. The workflow uses one Ubuntu job, the version from `backend/go.mod`, read-only repository permissions, and separate test with coverage, vet, and build steps.
+- Marked [PR #1](https://github.com/Ralet11/fullstack-calculator/pull/1) ready and squash-merged the verified head into `main` as `d75bf6b`. Fast-forwarded local `main` to the same commit and verified the existing log edits survived. This entry remains local.
+
+### Checks run
+
+- Verified the reviewed changes with `git diff --check c55e64c..5b7be58` and confirmed that the PR contained only `.github/workflows/backend.yml`. The [PR run](https://github.com/Ralet11/fullstack-calculator/actions/runs/45533516701) passed all backend checks on the reviewed commit.
+- Verified the post-merge [main run](https://github.com/Ralet11/fullstack-calculator/actions/runs/45534250938) for `d75bf6b`. Go 1.25.0 on Linux AMD64 ran the full suite with 93.0% statement coverage. Vet and the API build passed.
+
+## 2026-11-24 — Standard-operation test improvements
+
+Tool — Codex (ChatGPT). Purpose — close three test gaps identified in the standard-operation review.
+
+### Prompt
+
+> Now that the backend CI is verified on main I want to address the remaining testing improvments
+>
+> Strengthen the HTTP error contract tests by checking the public JSON fields independently from the production response types
+>
+> Improve the keyboard accesibility test so it doesnt depend on a fixed number of Tab presses
+>
+> Add a frontend recovery test for a non JSON HTTP error response, like an HTML 502
+>
+> Keep the existing architecture and application behavior unchanged, avoid unnecesary tests or refactoring
+>
+> Run the relevant frontend and backend checks, verify coverage and report the actual results
+
+### Decisions and outcome
+
+- Ramiro approved the three focused test improvements. The implementation affects only the backend HTTP tests, frontend behavior tests, and this log.
+- The Go error assertion checks the public `error`, `code`, and `message` JSON keys without using the handler's response type.
+- The keyboard test stops when it reaches the target button or focus repeats. It verifies Enter activation. The new HTML 502 case verifies the visible error, preserved operands, and successful retry.
+
+### Checks run
+
+- On Windows with Go 1.25.0, `go test -count=1 -coverpkg=./... -coverprofile=coverage.out ./...` passed both test packages. `go tool cover -func=coverage.out` reported 93.0% overall statements, 100.0% for arithmetic, and 96.6% for the HTTP package. `go vet ./...` and `go build -o ../.tooling/calculator-api.exe .` passed.
+- `npm.cmd ci --no-audit --no-fund` installed the locked dependencies. `npm.cmd run coverage` passed all 26 tests with 95.20% statement, 91.04% branch, and 97.39% line coverage. `npm.cmd run build` passed TypeScript checking and the Vite production build.
+- `git diff --check` passed. These changes were verified locally. No commit or push was made.
+
+## 2026-11-24 — Real-browser smoke test
+
+Tool — Codex (ChatGPT). Purpose — make the standard calculator’s browser verification reproducible from a fresh checkout.
+
+### Prompt
+
+> The testing improvements look good, lets complete the standard calculator verification with a reproducible browser smoke test
+> I want a small portable test that runs against the real React frontend and Go backend, not mocked API responses
+> Cover the precision chain 1 / 3 \* 3 = 1 and recovery from 8 / 0 by correcting the divisor to 2
+> Keep it simple and make sure someone cloning the repo can run it using documented commands, avoid unnecesary dependencies or a large E2E framework
+> Run the test and report what was actually verified, also check the existing tests still pass
+
+### Decisions and outcome
+
+- Ramiro approved adding a small real-stack browser check for precision and error recovery after the focused standard-operation test improvements.
+- Added a standalone Node script and one pinned Playwright Core development dependency. Documented how to start Go and Vite and install the headless Chromium shell. The script uses accessible keypad controls and observes real HTTP traffic.
+- Verified the rounded quotient display, the full quotient sent in the multiplication request, and the final result of `1`. Verified the real `422 DIVISION_BY_ZERO` response and visible error for `8 ÷ 0`, then edited the divisor, verified the Go response and display of `4`, and checked that the alert cleared.
+
+### Checks run
+
+- On Windows, started Go 1.25.0 with `go run .` and Vite with `npm.cmd run dev -- --strictPort`. `npx.cmd playwright-core install --only-shell chromium` and `npm.cmd run test:smoke` succeeded. Both scenarios passed in Chromium headless shell.
+- `go test -count=1 -coverpkg=./... -coverprofile=coverage.out ./...`, `go tool cover -func=coverage.out`, and `go vet ./...` passed. Backend statement coverage was 93.0%.
+- `npm.cmd run coverage` passed all 26 existing frontend tests with 97.39% line and 95.20% statement coverage. `npm.cmd run build` passed TypeScript checking and the Vite production build.
+- `node --check frontend/scripts/browser-smoke.mjs` and `git diff --check` passed. No commit or push was made.
