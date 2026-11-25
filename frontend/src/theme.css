@@ -1,0 +1,42 @@
+:root {
+  color-scheme: light;
+  font-family: "Segoe UI", system-ui, sans-serif;
+  --page: #eef0eb;
+  --surface: #f9faf5;
+  --ink: #19292e;
+  --muted: #4e6063;
+  --edge: #d0d7ce;
+  --key: #ffffff;
+  --key-hover: #eef3ef;
+  --key-muted: #e7ebe4;
+  --accent: #c9e9da;
+  --accent-hover: #b2deca;
+  --primary: #214f45;
+  --primary-hover: #163e36;
+  --display: #192d32;
+  --display-ink: #f6faf4;
+  --display-muted: #bee2d3;
+  --display-error: #ffc6ad;
+  --focus: #447768;
+  --radius: 0.625rem;
+  color: var(--ink);
+  background: var(--page);
+  font-synthesis: none;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+button {
+  font: inherit;
+}
+
+:focus-visible {
+  outline: 0.1875rem solid var(--focus);
+  outline-offset: 0.1875rem;
+}

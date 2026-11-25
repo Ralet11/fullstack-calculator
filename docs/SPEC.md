@@ -1,0 +1,101 @@
+Calculator — Functional Specification
+Version: 1.0
+Status: Approved for implementation
+Stack: React, TypeScript, Go
+1. Objective
+Build a responsive full-stack calculator with a React + TypeScript frontend and a Go REST API. The application should be intuitive, reliable, easy to test, and straightforward to extend without adding speculative features.
+
+The implementation includes the four required arithmetic operations and the three optional operations. Correctness, tests, and documentation take priority over additional features.
+2. Scope
+Standard mode: addition (add), subtraction (subtract), multiplication (multiply), and division (divide).
+
+Advanced mode: all Standard operations plus exponentiation (power), square root (sqrt), and direct percentage of a value (percentage).
+
+Contextual percentage: the % key modifies the second operand of a pending addition, subtraction, multiplication, or division.
+
+Both modes share the same calculator state and reusable UI elements. A database, authentication, expression parser, persistent history, and external mathematical services are out of scope.
+3. Interaction and User Experience
+The calculator uses sequential evaluation, not operator precedence:
+- 25 → + → 15 → = displays 40.
+- 10 → + → 5 → × → 2 → = displays 30 (evaluate 10 + 5 before × 2).
+Behavior:
+- = evaluates the pending operation. Repeated = keeps the result; it does not repeat the operation.
+- Changing the operator before entering the second operand replaces the pending operator.
+- Choosing another operator after entering the second operand evaluates the pending operation, then starts the next one.
+- After =, entering a digit starts a new calculation; choosing an operator continues from the result.
+- C clears all calculation state. Backspace edits the current input, and ± changes its sign.
+- A number may contain at most one decimal point. The entry display supports zero, negative values, and decimals, including intermediate typing states such as - and 0.; incomplete entries cannot be submitted.
+- Switching Standard/Advanced modes preserves the current calculation, including a pending operation.
+- While an API request is pending, display a loading state and prevent a duplicate calculation. Clear and mode switching remain available.
+- Clearing the calculation or starting a newer calculation invalidates outstanding responses so late HTTP results cannot overwrite the current state.
+- On a mathematical or network error, show an understandable message and preserve the editable inputs so the user can correct or retry. Clear always remains available.
+Keyboard: digits 0–9, ., +, -, *, /, Enter or = to calculate, Backspace to delete, and Escape to clear. Buttons must also work with mouse and touch. The interface must remain usable on narrow mobile screens, with readable results and visible keyboard focus.
+4. Percentages
+Support two distinct operations, with explicit UI controls:
+
+Direct percentage of a value (Advanced mode): 20% of 150 = 30. The user supplies both the base value and the percentage. This is the percentage API operation: a × b / 100.
+
+Contextual percentage: the % button acts on the entered second operand when an arithmetic operation is pending:
+Input	Calculation	Result
+150 + 20%	150 + (150 × 20 / 100)	180
+150 - 20%	150 - (150 × 20 / 100)	120
+150 × 20%	150 × (20 / 100)	30
+150 ÷ 20%	150 ÷ (20 / 100)	750
+
+
+Division by 0% is invalid. A standalone % key press with no pending operation does not create a direct percentage-of-a-value calculation; the Advanced mode offers a separate direct-percentage control.
+5. Backend and API
+The Go backend owns the arithmetic and domain validation. React owns keystrokes, calculator interaction state, and rendering. HTTP handlers decode and validate requests, call a calculation service independent of HTTP, and return JSON. The API is stateless.
+
+Endpoint: POST /api/calculate with Content-Type: application/json.
+
+Standard request:
+{"operation":"multiply","a":12,"b":5}
+Success (200 OK):
+{"result":60}
+Square root is unary; b must be omitted:
+{"operation":"sqrt","a":81}
+Direct percentage of a value (two operands):
+{"operation":"percentage","a":150,"b":20}
+Contextual percentage uses the existing arithmetic operation plus an optional boolean modifier:
+{"operation":"add","a":150,"b":20,"percentage":true}
+The result is 180. The percentage modifier defaults to false; it is valid only with add, subtract, multiply, or divide. Do not introduce separate addPercentage-style operation identifiers.
+
+All operations other than sqrt require both a and b; sqrt requires only a. Unrecognized fields, unsupported operations, strings or booleans in place of numeric operands, and inappropriate operand/modifier combinations are rejected.
+
+Error example (422 Unprocessable Content):
+{"error":{"code":"DIVISION_BY_ZERO","message":"Division by zero is not allowed."}}
+Use 400 for malformed JSON or invalid request fields and 422 Unprocessable Content for a structurally valid calculation that cannot produce a finite real-number result (for example division by zero, sqrt(-1), invalid real powers, or overflow). Both use the same JSON error shape. Unexpected server failures return 500 with a generic error message. No error response should expose internal details.
+6. Numerical Rules and Edge Cases
+- Calculate with Go float64. Keep the full returned numeric value for subsequent calculations; do not reuse the rounded display string.
+- Display at most 12 significant digits, removing unnecessary trailing zeros and avoiding obvious floating-point artifacts: 0.1 + 0.2 should display 0.3. This formatting rule does not promise exact decimal arithmetic.
+- Division by positive or negative zero is invalid.
+- Square roots of negative values are invalid; sqrt(0) = 0.
+- For this application, define 0^0 = 1. Reject powers with no finite real-number result, including negative bases raised to non-integer exponents and 0 raised to a negative exponent.
+- Reject non-finite results rather than serializing NaN or infinity in JSON.
+- Keep the implementation consistent for very large/small inputs, and document floating-point limitations. Financial-grade decimal precision is not in scope.
+7. Testing and Acceptance Criteria
+Automated tests are required for both layers, with reproducible coverage output.
+
+Backend tests: all seven operations; direct and contextual percentages; negative/zero/decimal operands; 0^0; negative bases with fractional exponents; division by ±0; square roots of negative values; overflow/non-finite results; missing operands; incorrect JSON types; malformed JSON; unknown operations; correct HTTP status and response shape.
+
+Frontend tests: entry and calculation via the API; sequential chaining; repeated equals; operator replacement; mode switching without losing state; direct and contextual percentage interactions; clear/backspace/sign/decimal keys; keyboard support; loading and errors; correction/retry; stale-response protection after Clear or a newer calculation.
+
+Manual checks: basic mobile viewport without horizontal overflow, visible focus, readable results, and mouse/touch interaction.
+
+Done means: the seven selected operations behave as specified, both applications can be run locally, relevant tests pass, coverage reports can be generated, and the README documents setup, execution, API examples, testing, and design choices. Do not claim completion based only on generated code.
+8. Future Evolution (Documentation Only)
+Document how the present separation of UI, interaction state, HTTP transport, and calculation logic would support future work such as:
+- An expression parser with parentheses and operator precedence (new parser/evaluator and likely a new API contract).
+- More scientific operations (additional calculation rules and tests).
+- Persistent history (storage and retrieval).
+- Higher-precision calculation (a revised numeric representation and contracts as needed).
+- Higher traffic (deployment, observability, limits, and scaling review).
+These are not part of the assessment implementation. The architecture should make changes manageable, not claim these features will require no changes.
+9. Deliverables
+- A Git repository containing the React/TypeScript frontend and Go backend.
+- Unit tests for each layer and a coverage report or reproducible coverage commands.
+- A README with setup, how to run both applications, REST examples, and design decisions/assumptions.
+- An accurate record of AI prompts used during the project.
+- A repository link for submission.
+- Docker and a live demo are optional only after mandatory work is complete.

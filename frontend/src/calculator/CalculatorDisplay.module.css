@@ -1,0 +1,40 @@
+.display {
+  min-width: 0;
+  padding: 1rem;
+  border-radius: 0.875rem;
+  background: var(--display);
+  color: var(--display-ink);
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  min-height: 1.25rem;
+  color: var(--display-muted);
+  font-size: 0.875rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.value {
+  display: block;
+  margin-top: 0.25rem;
+  overflow-x: auto;
+  text-align: end;
+  white-space: nowrap;
+  font-size: clamp(1.625rem, 7.5vw, 2.75rem);
+  font-weight: 650;
+  letter-spacing: -0.05em;
+  font-variant-numeric: tabular-nums;
+}
+
+.value:focus-visible {
+  outline-color: var(--display-muted);
+}
+
+.error {
+  margin: 0.625rem 0 0;
+  color: var(--display-error);
+  font-size: 0.875rem;
+  overflow-wrap: anywhere;
+}

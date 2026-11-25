@@ -1,0 +1,5 @@
+/.tooling/
+/frontend/node_modules/
+/frontend/dist/
+/frontend/coverage/
+/backend/coverage.out
