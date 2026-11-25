@@ -30,6 +30,7 @@ Behavior:
 - Clearing the calculation or starting a newer calculation invalidates outstanding responses so late HTTP results cannot overwrite the current state.
 - On a mathematical or network error, show an understandable message and preserve the editable inputs so the user can correct or retry. Clear always remains available.
 Keyboard: digits 0–9, ., +, -, *, /, Enter or = to calculate, Backspace to delete, and Escape to clear. Buttons must also work with mouse and touch. The interface must remain usable on narrow mobile screens, with readable results and visible keyboard focus.
+In Advanced mode, the xʸ button and ^ key start a power operation. Switching to Standard mode hides the button and disables that shortcut while preserving any pending calculation.
 4. Percentages
 Support two distinct operations, with explicit UI controls:
 
@@ -66,6 +67,7 @@ All operations other than sqrt require both a and b; sqrt requires only a. Unrec
 Error example (422 Unprocessable Content):
 {"error":{"code":"DIVISION_BY_ZERO","message":"Division by zero is not allowed."}}
 Use 400 for malformed JSON or invalid request fields and 422 Unprocessable Content for a structurally valid calculation that cannot produce a finite real-number result (for example division by zero, sqrt(-1), invalid real powers, or overflow). Both use the same JSON error shape. Unexpected server failures return 500 with a generic error message. No error response should expose internal details.
+Power takes a as the base and b as the exponent. Omit percentage on power requests. Non-integer exponents for negative bases and negative exponents for zero return 422 with INVALID_POWER and a message specific to the case. Overflow returns 422 with NON_FINITE_RESULT.
 6. Numerical Rules and Edge Cases
 - Calculate with Go float64. Keep the full returned numeric value for subsequent calculations; do not reuse the rounded display string.
 - Display at most 12 significant digits, removing unnecessary trailing zeros and avoiding obvious floating-point artifacts: 0.1 + 0.2 should display 0.3. This formatting rule does not promise exact decimal arithmetic.

@@ -427,3 +427,55 @@ describe('subtraction calculator', () => {
     expect(screen.queryByText('-5 +')).toBeNull()
   })
 })
+
+describe('advanced power', () => {
+  it('enables power only in Advanced mode and chains it from left to right', async () => {
+    fetchMock.mockResolvedValueOnce(reply(5)).mockResolvedValueOnce(reply(25))
+    const { press, user, value } = openCalculator()
+
+    expect(screen.getByRole('button', { name: 'Standard', pressed: true })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Power' })).toBeNull()
+    await user.keyboard('2+3^')
+    expect(fetchMock).not.toHaveBeenCalled()
+    expect(value()).toBe('3')
+
+    await press('Advanced')
+    expect(screen.getByRole('button', { name: 'Power' }).textContent?.trim()).toBe('xʸ')
+    await user.keyboard('^')
+    await screen.findByText('5 ^')
+    await user.keyboard('2=')
+
+    expect(requestBody()).toEqual({ operation: 'add', a: 2, b: 3 })
+    expect(requestBody(1)).toEqual({ operation: 'power', a: 5, b: 2 })
+    await waitFor(() => expect(value()).toBe('25'))
+  })
+
+  it('preserves the pending power, in-flight request, and result when switching modes', async () => {
+    const response = deferredResponse()
+    fetchMock.mockReturnValueOnce(response.promise)
+    const { press, user, value } = openCalculator()
+
+    await press('Advanced')
+    await user.keyboard('2')
+    await press('Power')
+    await user.keyboard('3')
+    await press('Standard')
+    expect(screen.queryByRole('button', { name: 'Power' })).toBeNull()
+    expect(screen.getByText('2 ^')).toBeTruthy()
+    expect(value()).toBe('3')
+
+    await user.keyboard('=')
+    expect(requestBody()).toEqual({ operation: 'power', a: 2, b: 3 })
+    expect(screen.getByText('Calculating…')).toBeTruthy()
+    await press('Advanced')
+    expect(screen.getByRole('button', { name: 'Advanced', pressed: true })).toBeTruthy()
+    expect(screen.getByText('Calculating…')).toBeTruthy()
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(fetchMock.mock.calls[0][1]?.signal?.aborted).toBe(false)
+
+    await act(async () => response.resolve(reply(8)))
+    expect(value()).toBe('8')
+    await press('Standard')
+    expect(value()).toBe('8')
+  })
+})

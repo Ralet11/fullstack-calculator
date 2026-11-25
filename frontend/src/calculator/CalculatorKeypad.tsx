@@ -2,11 +2,12 @@ import type { CalculatorAction } from './calculatorReducer'
 import styles from './CalculatorKeypad.module.css'
 
 type Props = {
+  advanced: boolean
   loading: boolean
   onAction: (action: CalculatorAction) => void
 }
 
-export function CalculatorKeypad({ loading, onAction }: Props) {
+export function CalculatorKeypad({ advanced, loading, onAction }: Props) {
   const digits = ['7', '8', '9', '4', '5', '6', '1', '2', '3', '0']
 
   return (
@@ -31,6 +32,17 @@ export function CalculatorKeypad({ loading, onAction }: Props) {
       ))}
       <button type="button" disabled={loading} onClick={() => onAction({ type: 'decimal' })} aria-label="Decimal point">.</button>
       <button type="button" className={styles.equals} disabled={loading} onClick={() => onAction({ type: 'equals' })} aria-label="Equals">=</button>
+      {advanced && (
+        <button
+          type="button"
+          className={`${styles.operator} ${styles.power}`}
+          disabled={loading}
+          onClick={() => onAction({ type: 'power' })}
+          aria-label="Power"
+        >
+          xʸ
+        </button>
+      )}
     </div>
   )
 }

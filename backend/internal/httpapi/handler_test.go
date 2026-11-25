@@ -25,6 +25,7 @@ func TestCalculate(t *testing.T) {
 		{"divide decimal operands", `{"operation":"divide","a":-7.5,"b":2.5,"percentage":false}`, -3},
 		{"divide without rounding quotient", `{"operation":"divide","a":1,"b":3}`, 0.3333333333333333},
 		{"zero dividend", `{"operation":"divide","a":0,"b":5}`, 0},
+		{"power uses a as the base", `{"operation":"power","a":2,"b":3}`, 8},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			recorder := sendRequest(http.MethodPost, "application/json; charset=utf-8", test.body)
@@ -53,7 +54,10 @@ func TestCalculateRejectsInvalidBodies(t *testing.T) {
 		{"incorrect field case", `{"operation":"add","A":2,"b":3}`},
 		{"missing operation", `{"a":2,"b":3}`},
 		{"invalid operation type", `{"operation":1,"a":2,"b":3}`},
-		{"unsupported operation", `{"operation":"power","a":2,"b":3}`},
+		{"unsupported operation", `{"operation":"unknown","a":2,"b":3}`},
+		{"power missing exponent", `{"operation":"power","a":2}`},
+		{"power with a percentage modifier", `{"operation":"power","a":2,"b":3,"percentage":true}`},
+		{"power with a false percentage modifier", `{"operation":"power","a":2,"b":3,"percentage":false}`},
 		{"missing left", `{"operation":"add","b":3}`},
 		{"missing right", `{"operation":"add","a":2}`},
 		{"string operand", `{"operation":"add","a":2,"b":"3"}`},
@@ -84,6 +88,7 @@ func TestCalculateRejectsOverflow(t *testing.T) {
 		`{"operation":"subtract","a":1e308,"b":-1e308}`,
 		`{"operation":"multiply","a":1e308,"b":2}`,
 		`{"operation":"divide","a":1e308,"b":0.1}`,
+		`{"operation":"power","a":1e308,"b":2}`,
 	} {
 		t.Run(body, func(t *testing.T) {
 			recorder := sendRequest(http.MethodPost, "application/json", body)
@@ -101,6 +106,23 @@ func TestCalculateRejectsDivisionByZero(t *testing.T) {
 		t.Run(body, func(t *testing.T) {
 			recorder := sendRequest(http.MethodPost, "application/json", body)
 			checkError(t, recorder, http.StatusUnprocessableEntity, "DIVISION_BY_ZERO")
+		})
+	}
+}
+
+func TestCalculateRejectsInvalidRealPowers(t *testing.T) {
+	for _, test := range []struct {
+		name, request, wantMessage string
+	}{
+		{"negative base with fractional exponent", `{"operation":"power","a":-2,"b":0.5}`, "A negative base requires an integer exponent."},
+		{"zero with negative exponent", `{"operation":"power","a":0,"b":-1}`, "Zero cannot be raised to a negative exponent."},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			recorder := sendRequest(http.MethodPost, "application/json", test.request)
+			message := checkError(t, recorder, http.StatusUnprocessableEntity, "INVALID_POWER")
+			if message != test.wantMessage {
+				t.Errorf("message = %q; want %q", message, test.wantMessage)
+			}
 		})
 	}
 }
@@ -133,7 +155,7 @@ func checkResponse(t *testing.T, recorder *httptest.ResponseRecorder, status int
 	}
 }
 
-func checkError(t *testing.T, recorder *httptest.ResponseRecorder, status int, code string) {
+func checkError(t *testing.T, recorder *httptest.ResponseRecorder, status int, code string) string {
 	t.Helper()
 	checkResponse(t, recorder, status)
 	var body map[string]any
@@ -148,4 +170,5 @@ func checkError(t *testing.T, recorder *httptest.ResponseRecorder, status int, c
 	if details["code"] != code || !ok || strings.TrimSpace(message) == "" {
 		t.Fatalf("error = %+v; want code %q and a non-empty message", details, code)
 	}
+	return message
 }

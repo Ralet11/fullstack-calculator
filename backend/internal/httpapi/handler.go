@@ -72,8 +72,10 @@ func calculate(w http.ResponseWriter, r *http.Request) {
 		apply = calculator.Multiply
 	case "divide":
 		apply = calculator.Divide
+	case "power":
+		apply = calculator.Power
 	default:
-		writeError(w, http.StatusBadRequest, "INVALID_REQUEST", "Supported operations are add, subtract, multiply, and divide.")
+		writeError(w, http.StatusBadRequest, "INVALID_REQUEST", "Supported operations are add, subtract, multiply, divide, and power.")
 		return
 	}
 
@@ -84,9 +86,15 @@ func calculate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if percentage, present := fields["percentage"]; present && string(percentage) != "false" {
-		writeError(w, http.StatusBadRequest, "INVALID_REQUEST", "Omit percentage or set it to false.")
-		return
+	if percentage, present := fields["percentage"]; present {
+		if operation == "power" {
+			writeError(w, http.StatusBadRequest, "INVALID_REQUEST", "Omit percentage for power.")
+			return
+		}
+		if string(percentage) != "false" {
+			writeError(w, http.StatusBadRequest, "INVALID_REQUEST", "Omit percentage or set it to false.")
+			return
+		}
 	}
 
 	result, err := apply(a, b)
@@ -96,6 +104,11 @@ func calculate(w http.ResponseWriter, r *http.Request) {
 	}
 	if errors.Is(err, calculator.ErrNonFiniteResult) {
 		writeError(w, http.StatusUnprocessableEntity, "NON_FINITE_RESULT", "The result exceeds the supported number range.")
+		return
+	}
+	var invalidPower calculator.InvalidPowerError
+	if errors.As(err, &invalidPower) {
+		writeError(w, http.StatusUnprocessableEntity, "INVALID_POWER", invalidPower.Error())
 		return
 	}
 	if err != nil {

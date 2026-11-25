@@ -1,6 +1,6 @@
 # Calculator
 
-A React and TypeScript calculator with a Go JSON API. It supports addition, subtraction, multiplication, and division with negative and decimal operands. Mixed chains evaluate from left to right.
+A React and TypeScript calculator with a Go JSON API. It supports addition, subtraction, multiplication, and division with negative and decimal operands. Mixed chains evaluate from left to right. Advanced mode adds power with the `xʸ` button or `^` key.
 
 ## Run locally
 
@@ -33,7 +33,7 @@ curl -H 'Content-Type: application/json' \
   http://127.0.0.1:8080/api/calculate
 ```
 
-The response is HTTP 200 with `{"result":40}`. The other operation names are `subtract`, `multiply`, and `divide`. Both operands are required and must be finite JSON numbers. The optional `percentage` field may be omitted or set to `false` in this milestone. Invalid input returns HTTP 400. Division by either sign of zero returns HTTP 422 with `{"error":{"code":"DIVISION_BY_ZERO","message":"Division by zero is not allowed."}}`. Overflow returns HTTP 422 with the code `NON_FINITE_RESULT`.
+The response is HTTP 200 with `{"result":40}`. The other operation names are `subtract`, `multiply`, and `divide`. Both operands are required and must be finite JSON numbers. For the four standard operations, the optional `percentage` field may be omitted or set to `false`. Omit it for power. Invalid input returns HTTP 400. Division by either sign of zero returns HTTP 422 with `{"error":{"code":"DIVISION_BY_ZERO","message":"Division by zero is not allowed."}}`. Overflow returns HTTP 422 with the code `NON_FINITE_RESULT`. For power, send `{"operation":"power","a":2,"b":3}` to get `{"result":8}`. A negative base with a fractional exponent or zero with a negative exponent returns HTTP 422 with `INVALID_POWER`.
 
 ## Tests and coverage
 

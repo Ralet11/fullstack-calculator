@@ -431,3 +431,56 @@ Tool — Codex (ChatGPT). Purpose — make the standard calculator’s browser v
 - `go test -count=1 -coverpkg=./... -coverprofile=coverage.out ./...`, `go tool cover -func=coverage.out`, and `go vet ./...` passed. Backend statement coverage was 93.0%.
 - `npm.cmd run coverage` passed all 26 existing frontend tests with 97.39% line and 95.20% statement coverage. `npm.cmd run build` passed TypeScript checking and the Vite production build.
 - `node --check frontend/scripts/browser-smoke.mjs` and `git diff --check` passed. No commit or push was made.
+
+## 2026-11-25 — Power operation review
+
+Tool — Codex (ChatGPT). Purpose — review power semantics, API behavior, and focused test cases before implementation.
+
+### Prompt
+
+> I want to start working on the power operation
+>
+> My idea is to extend the current calculation flow using the first operand as the base and the second as the exponent, keeping left to right evaluation and the existing API contract
+>
+> Before implementing I want to review the numerical edge cases, specially 0^0, negative bases with fractional exponents, zero with negative exponents and overflow
+>
+> Check SPEC.md and the current architecture, tell me if this approach makes sense and if theres anything we should handle differently
+>
+> Also review what tests we actually need without duplicating existing coverage
+>
+> Focus on the decisions that need my approval, dont suggest changes just for the sake of refactoring
+
+### Outcome and checks
+
+- Reviewed `docs/SPEC.md`, the project guidelines, Go arithmetic and HTTP validation, and the React binary-operation flow plus existing tests. Checked the standard library's documented `math.Pow` behavior.
+- Confirmed power fits the existing binary request and left-to-right sequencing. The spec defines `0^0 = 1`, rejects negative bases with non-integer exponents and zero bases with negative exponents, and uses HTTP 422 for invalid real powers or overflow.
+- Pending recommendations are `INVALID_POWER` for those two domain failures, the existing `NON_FINITE_RESULT` for overflow, omission of the contextual percentage field on power, and a minimal Advanced-mode toggle with a power button and caret shortcut if the UI ships in the same slice. Preserve the pending calculation when switching modes.
+- Recommended a focused arithmetic table, a few HTTP contract cases, and one mixed-operation UI chain. Cover mode switching once if introduced with power. No application or test code was changed, and no suites were rerun during this review.
+
+## 2026-11-25 — Advanced power operation
+
+Tool — Codex (ChatGPT). Purpose — implement and verify power using the existing calculator flow.
+
+### Prompt
+
+> I agree with both recommendations, lets proceed with the power operation
+> Use INVALID_POWER with HTTP 422 for domain errors and keep NON_FINITE_RESULT for overflow, with specific error messages for each case
+> Add the minimal Standard and Advanced mode toggle, power should only be available in Advanced mode with an xʸ button and ^ keyboard shortcut
+> Switching modes should preserve the current calculator state, including pending operations and results
+> Reuse the existing API, reducer and request flow. Keep left to right evaluation and follow the numerical rules defined in SPEC.md
+> Add the relevant Go, HTTP and React tests we discussed, including numerical edge cases, mixed chains and switching modes
+> Run the existing checks, coverage and browser smoke test to make sure nothing breaks. Report the actual results
+> Keep the changes focused, no square root or percentage yet and avoid unnecesary refactoring
+
+### Decisions and outcome
+
+- Ramiro approved both recommendations from the [power operation review](#2026-11-25--power-operation-review). Power uses `a` as the base and `b` as the exponent. Domain errors return HTTP 422 with `INVALID_POWER` and a case-specific message. Overflow retains `NON_FINITE_RESULT`. A power request omits the contextual percentage field.
+- Added the Go power function and HTTP dispatch. The React mode toggle controls the power button and shortcut independently of the pending calculation and request state. Existing calculations run left to right, and switching modes preserves operands, pending operations, in-flight requests, and results.
+- Added focused Go and HTTP power tests plus two React tests for the mixed chain and mode switching. Documented the keyboard and API rules in the spec and README.
+
+### Checks run
+
+- On Windows with Go 1.25.0, `go test -count=1 -coverpkg=./... -coverprofile=coverage.out ./...`, `go tool cover -func=coverage.out`, `go vet ./...`, and `go build -o ../.tooling/calculator-api-power.exe .` passed. Overall Go statement coverage was 93.0%, and the `Power` function had 100.0% statement coverage.
+- `npm.cmd run coverage` passed all 28 frontend tests with 97.47% line, 95.34% statement, and 91.36% branch coverage. `npm.cmd run build` passed TypeScript checking and the Vite production build.
+- Windows Code Integrity blocked the temporary executable from `go run .`. Started the standalone build directly and ran `npm.cmd run test:smoke` against it and Vite. Both existing smoke scenarios passed. An additional live Chromium check verified that a pending power survived a switch to Standard, returned `8` for `2^3`, and showed the API's `INVALID_POWER` message for `(-2)^0.5`.
+- `git -c core.whitespace=cr-at-eol diff --check` passed with the specification's existing Windows line endings. No commit or push was made.

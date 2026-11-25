@@ -2,7 +2,7 @@ type EntryAction =
   | { type: 'digit'; digit: string }
   | { type: 'decimal' | 'sign' | 'backspace' }
 
-export type Operation = 'add' | 'subtract' | 'multiply' | 'divide'
+export type Operation = 'add' | 'subtract' | 'multiply' | 'divide' | 'power'
 
 export type CalculatorAction = EntryAction | { type: Operation | 'equals' | 'clear' }
 

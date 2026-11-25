@@ -135,3 +135,51 @@ func TestDivideRejectsOverflow(t *testing.T) {
 		t.Errorf("Divide(1e308, 0.1) error = %v; want ErrNonFiniteResult", err)
 	}
 }
+
+func TestPower(t *testing.T) {
+	for _, test := range []struct {
+		name           string
+		base, exponent float64
+		want           float64
+	}{
+		{"positive integer exponent", 2, 3, 8},
+		{"zero to zero", 0, 0, 1},
+		{"zero to positive exponent", 0, 2, 0},
+		{"negative base with odd exponent", -2, 3, -8},
+		{"negative base with even exponent", -2, 4, 16},
+		{"positive base with fractional exponent", 4, 0.5, 2},
+		{"nonzero base with negative exponent", 2, -3, 0.125},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			got, err := Power(test.base, test.exponent)
+			if err != nil || got != test.want {
+				t.Fatalf("Power(%g, %g) = %g, %v; want %g", test.base, test.exponent, got, err, test.want)
+			}
+		})
+	}
+}
+
+func TestPowerRejectsInvalidRealPowers(t *testing.T) {
+	for _, test := range []struct {
+		name           string
+		base, exponent float64
+	}{
+		{"negative base with fractional exponent", -2, 0.5},
+		{"negative base just above an integer exponent", -2, math.Nextafter(2, 3)},
+		{"zero with negative exponent", 0, -1},
+		{"negative zero with negative exponent", math.Copysign(0, -1), -1},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			var domainError InvalidPowerError
+			if _, err := Power(test.base, test.exponent); !errors.As(err, &domainError) {
+				t.Errorf("Power(%g, %g) error = %v; want InvalidPowerError", test.base, test.exponent, err)
+			}
+		})
+	}
+}
+
+func TestPowerRejectsOverflow(t *testing.T) {
+	if _, err := Power(1e308, 2); !errors.Is(err, ErrNonFiniteResult) {
+		t.Errorf("Power(1e308, 2) error = %v; want ErrNonFiniteResult", err)
+	}
+}
