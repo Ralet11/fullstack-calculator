@@ -24,6 +24,7 @@ const operationSymbols: Record<Operation, string> = {
   multiply: '×',
   divide: '÷',
   power: '^',
+  percentage: 'percent of value',
 }
 
 function formatNumber(value: number): string {
@@ -67,6 +68,7 @@ export function Calculator() {
     ? `${formatNumber(state.pending.left)} ${operationSymbols[state.pending.operation]}`
     : ''
   const value = state.entry || formatNumber(state.result ?? state.pending?.left ?? 0)
+  const percentageMarked = state.pending?.percentage === true
 
   return (
     <section className={styles.calculator} aria-label="Calculator" onClick={focusDisplayAfterPointerClick}>
@@ -74,8 +76,8 @@ export function Calculator() {
         <button type="button" aria-pressed={!advanced} onClick={() => setAdvanced(false)}>Standard</button>
         <button type="button" aria-pressed={advanced} onClick={() => setAdvanced(true)}>Advanced</button>
       </div>
-      <CalculatorDisplay ref={display} value={value} pending={pending} loading={state.loading} error={state.error} />
-      <CalculatorKeypad advanced={advanced} loading={state.loading} onAction={send} />
+      <CalculatorDisplay ref={display} value={percentageMarked ? value + '%' : value} pending={pending} loading={state.loading} error={state.error} />
+      <CalculatorKeypad advanced={advanced} loading={state.loading} onAction={send} percentageMarked={percentageMarked} />
       <p className={styles.hint}><kbd>Enter</kbd> calculate · <kbd>Esc</kbd> clear</p>
     </section>
   )

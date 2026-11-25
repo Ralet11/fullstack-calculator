@@ -56,6 +56,38 @@ try {
   await expectDisplay('4')
   await alert.waitFor({ state: 'hidden' })
   console.log('PASS 8 ÷ 0 shows the Go error, then correcting the divisor to 2 gives 4')
+
+  await button('Clear').click()
+  await button('Advanced').click()
+  for (const name of ['1', '5', '0', 'Divide', '0', 'Contextual percentage']) {
+    await button(name).click()
+  }
+  await expectDisplay('0%')
+  await button('Standard').click()
+  await button('Contextual percentage').waitFor({ state: 'hidden' })
+  await expectDisplay('0%')
+
+  const { error: percentageError } = await pressCalculation(
+    'Equals', { operation: 'divide', a: 150, b: 0, percentage: true }, 422,
+  )
+  assert.equal(percentageError.code, 'DIVISION_BY_ZERO')
+  await alert.and(page.getByText(percentageError.message, { exact: true })).waitFor()
+  await expectDisplay('0%')
+
+  await button('Advanced').click()
+  await page.getByRole('button', { name: 'Contextual percentage', pressed: true }).waitFor()
+  await alert.waitFor()
+  await button('2').click()
+  await button('0').click()
+  await expectDisplay('20%')
+  assert.deepEqual(
+    await pressCalculation('Equals', { operation: 'divide', a: 150, b: 20, percentage: true }),
+    { result: 750 },
+  )
+  await expectDisplay('750')
+  await alert.waitFor({ state: 'hidden' })
+  await page.getByRole('button', { name: 'Contextual percentage', pressed: false }).waitFor()
+  console.log('PASS 150 ÷ 0% preserves the marker across modes and correcting the rate to 20% gives 750')
 } finally {
   await browser.close()
 }

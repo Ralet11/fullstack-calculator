@@ -27,18 +27,23 @@ func TestCalculate(t *testing.T) {
 		{"zero dividend", `{"operation":"divide","a":0,"b":5}`, 0},
 		{"power uses a as the base", `{"operation":"power","a":2,"b":3}`, 8},
 		{"square root with one operand", `{"operation":"sqrt","a":81}`, 9},
+		{"direct percentage", `{"operation":"percentage","a":150,"b":20}`, 30},
+		{"contextual percentage addition", `{"operation":"add","a":150,"b":20,"percentage":true}`, 180},
+		{"contextual percentage subtraction", `{"operation":"subtract","a":150,"b":20,"percentage":true}`, 120},
+		{"contextual percentage multiplication", `{"operation":"multiply","a":150,"b":20,"percentage":true}`, 30},
+		{"contextual percentage division", `{"operation":"divide","a":150,"b":20,"percentage":true}`, 750},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			recorder := sendRequest(http.MethodPost, "application/json; charset=utf-8", test.body)
 			checkResponse(t, recorder, http.StatusOK)
 
-			var body map[string]float64
+			var body map[string]any
 			if err := json.Unmarshal(recorder.Body.Bytes(), &body); err != nil {
 				t.Fatalf("decode response: %v", err)
 			}
-			got, present := body["result"]
-			if !present || len(body) != 1 || got != test.want {
-				t.Fatalf("response = %v; want result %g", body, test.want)
+			got, isNumber := body["result"].(float64)
+			if !isNumber || len(body) != 1 || got != test.want {
+				t.Fatalf("response = %s; want a JSON number with result %g", recorder.Body, test.want)
 			}
 		})
 	}
@@ -53,6 +58,9 @@ func TestCalculateRejectsInvalidBodies(t *testing.T) {
 		{"multiple values", `{"operation":"add","a":2,"b":3} {}`},
 		{"unknown field", `{"operation":"add","a":2,"b":3,"extra":4}`},
 		{"incorrect field case", `{"operation":"add","A":2,"b":3}`},
+		{"duplicate operation", `{"operation":"add","operation":"divide","a":2,"b":3}`},
+		{"duplicate operand with an escaped key", `{"operation":"add","a":2,"\u0061":2,"b":3}`},
+		{"duplicate modifier masking an invalid type", `{"operation":"add","a":2,"b":3,"percentage":"true","percentage":false}`},
 		{"missing operation", `{"a":2,"b":3}`},
 		{"invalid operation type", `{"operation":1,"a":2,"b":3}`},
 		{"unsupported operation", `{"operation":"unknown","a":2,"b":3}`},
@@ -70,11 +78,10 @@ func TestCalculateRejectsInvalidBodies(t *testing.T) {
 		{"boolean operand", `{"operation":"add","a":false,"b":3}`},
 		{"null operand", `{"operation":"add","a":2,"b":null}`},
 		{"out-of-range operand", `{"operation":"add","a":1e999,"b":3}`},
-		{"contextual percentage deferred", `{"operation":"add","a":2,"b":3,"percentage":true}`},
-		{"subtraction contextual percentage deferred", `{"operation":"subtract","a":2,"b":3,"percentage":true}`},
+		{"direct percentage missing rate", `{"operation":"percentage","a":150}`},
+		{"direct percentage with a modifier", `{"operation":"percentage","a":150,"b":20,"percentage":true}`},
+		{"direct percentage with a false modifier", `{"operation":"percentage","a":150,"b":20,"percentage":false}`},
 		{"subtraction missing right", `{"operation":"subtract","a":2}`},
-		{"multiplication contextual percentage deferred", `{"operation":"multiply","a":2,"b":3,"percentage":true}`},
-		{"division contextual percentage deferred", `{"operation":"divide","a":2,"b":3,"percentage":true}`},
 		{"division missing divisor", `{"operation":"divide","a":2}`},
 		{"division string divisor", `{"operation":"divide","a":2,"b":"0"}`},
 		{"non-boolean modifier", `{"operation":"add","a":2,"b":3,"percentage":"false"}`},
@@ -95,6 +102,8 @@ func TestCalculateRejectsOverflow(t *testing.T) {
 		`{"operation":"multiply","a":1e308,"b":2}`,
 		`{"operation":"divide","a":1e308,"b":0.1}`,
 		`{"operation":"power","a":1e308,"b":2}`,
+		`{"operation":"percentage","a":1e308,"b":200}`,
+		`{"operation":"divide","a":1,"b":5e-324,"percentage":true}`,
 	} {
 		t.Run(body, func(t *testing.T) {
 			recorder := sendRequest(http.MethodPost, "application/json", body)
@@ -108,6 +117,8 @@ func TestCalculateRejectsDivisionByZero(t *testing.T) {
 		`{"operation":"divide","a":8,"b":0}`,
 		`{"operation":"divide","a":8,"b":-0}`,
 		`{"operation":"divide","a":0,"b":0}`,
+		`{"operation":"divide","a":150,"b":0,"percentage":true}`,
+		`{"operation":"divide","a":150,"b":-0,"percentage":true}`,
 	} {
 		t.Run(body, func(t *testing.T) {
 			recorder := sendRequest(http.MethodPost, "application/json", body)

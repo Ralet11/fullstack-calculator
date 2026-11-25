@@ -35,9 +35,9 @@ The Advanced mode √ button applies square root immediately to the input or res
 4. Percentages
 Support two distinct operations, with explicit UI controls:
 
-Direct percentage of a value (Advanced mode): 20% of 150 = 30. The user supplies both the base value and the percentage. This is the percentage API operation: a × b / 100.
+Direct percentage of a value (Advanced mode): enter the base, press Percent of value, enter the rate, and evaluate. For example, 150 → Percent of value → 20 → = displays 30. This is the percentage API operation: a × b / 100.
 
-Contextual percentage: the % button acts on the entered second operand when an arithmetic operation is pending:
+Contextual percentage: the Advanced mode % button toggles a visible marker on the entered right operand of a pending add, subtract, multiply, or divide. It sends no request. Editing the operand, applying square root, or switching modes preserves the marker. Erasing the operand, clearing, or successfully evaluating the operation removes it. Evaluating a chain consumes one marker at a time, so 150 + 20% × 10% displays 18:
 Input	Calculation	Result
 150 + 20%	150 + (150 × 20 / 100)	180
 150 - 20%	150 - (150 × 20 / 100)	120
@@ -45,7 +45,8 @@ Input	Calculation	Result
 150 ÷ 20%	150 ÷ (20 / 100)	750
 
 
-Division by 0% is invalid. A standalone % key press with no pending operation does not create a direct percentage-of-a-value calculation; the Advanced mode offers a separate direct-percentage control.
+Either sign of zero as the contextual divisor returns 422 with DIVISION_BY_ZERO. Zero is a valid rate for the other operations. Rates may be signed, fractional, or greater than 100. Percentage arithmetic preserves the supplied float64 values, uses exact intermediate calculations, and rounds the final result to float64. This avoids intermediate overflow and underflow. A final non-finite result returns 422 with NON_FINITE_RESULT.
+% leaves the state alone when there is no eligible pending operation or right operand.
 5. Backend and API
 The Go backend owns the arithmetic and domain validation. React owns keystrokes, calculator interaction state, and rendering. HTTP handlers decode and validate requests, call a calculation service independent of HTTP, and return JSON. The API is stateless.
 
@@ -62,7 +63,7 @@ Direct percentage of a value (two operands):
 {"operation":"percentage","a":150,"b":20}
 Contextual percentage uses the existing arithmetic operation plus an optional boolean modifier:
 {"operation":"add","a":150,"b":20,"percentage":true}
-The result is 180. The percentage modifier defaults to false; it is valid only with add, subtract, multiply, or divide. Do not introduce separate addPercentage-style operation identifiers.
+The result is 180. The percentage modifier defaults to false and must be a boolean when supplied. Only add, subtract, multiply, and divide accept it. Omit it for direct percentage, power, and square root. Do not introduce separate addPercentage-style operation identifiers.
 
 All operations other than sqrt require both a and b; sqrt requires only a. Unrecognized fields, unsupported operations, strings or booleans in place of numeric operands, and inappropriate operand/modifier combinations are rejected.
 
@@ -71,7 +72,7 @@ Error example (422 Unprocessable Content):
 Use 400 for malformed JSON or invalid request fields and 422 Unprocessable Content for a structurally valid calculation that cannot produce a finite real-number result (for example division by zero, sqrt(-1), invalid real powers, or overflow). Both use the same JSON error shape. Unexpected server failures return 500 with a generic error message. No error response should expose internal details.
 Power takes a as the base and b as the exponent. Omit percentage on power requests. Non-integer exponents for negative bases and negative exponents for zero return 422 with INVALID_POWER and a message specific to the case. Overflow returns 422 with NON_FINITE_RESULT.
 6. Numerical Rules and Edge Cases
-- Calculate with Go float64. Keep the full returned numeric value for subsequent calculations; do not reuse the rounded display string.
+- Use float64 for operands and results. Percentage operations use the intermediate precision described above. Keep the full returned numeric value for subsequent calculations; do not reuse the rounded display string.
 - Display at most 12 significant digits, removing unnecessary trailing zeros and avoiding obvious floating-point artifacts: 0.1 + 0.2 should display 0.3. This formatting rule does not promise exact decimal arithmetic.
 - Division by positive or negative zero is invalid.
 - Square roots of negative values are invalid; sqrt(0) = 0.

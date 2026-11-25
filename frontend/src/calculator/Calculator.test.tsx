@@ -118,17 +118,22 @@ describe('addition calculator', () => {
     expect(value()).toBe('0')
   })
 
-  it('activates a keypad button with native keyboard focus', async () => {
+  it('tabs through the keypad in row order and activates a focused digit', async () => {
     const { user, value } = openCalculator()
-    const seven = screen.getByRole('button', { name: '7' })
+    const add = screen.getByRole('button', { name: 'Add' })
     const visited = new Set<Element | null>()
-    while (document.activeElement !== seven && !visited.has(document.activeElement)) {
+    while (document.activeElement !== add && !visited.has(document.activeElement)) {
       visited.add(document.activeElement)
       await user.tab()
     }
-    expect(document.activeElement).toBe(seven)
+    expect(document.activeElement).toBe(add)
+
+    for (const name of ['7', '8', '9', 'Subtract', '4']) {
+      await user.tab()
+      expect(document.activeElement).toBe(screen.getByRole('button', { name }))
+    }
     await user.keyboard('{Enter}')
-    expect(value()).toBe('7')
+    expect(value()).toBe('4')
   })
 
   it('shows loading, blocks duplicate calculations, and ignores a stale success after Clear', async () => {
@@ -549,5 +554,100 @@ describe('advanced square root', () => {
     await waitFor(() => expect(value()).toBe('3'))
     expect(screen.getByText('2 +')).toBeTruthy()
     expect(screen.queryByRole('alert')).toBeNull()
+  })
+})
+
+describe('advanced percentages', () => {
+  it('sends a direct percentage with the base first and starts a new chain from the result', async () => {
+    fetchMock.mockResolvedValueOnce(reply(30)).mockResolvedValueOnce(reply(35))
+    const { press, user, value } = openCalculator()
+
+    expect(screen.queryByRole('button', { name: 'Percent of value' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Contextual percentage' })).toBeNull()
+    await press('Advanced')
+    await user.keyboard('150')
+    await press('Percent of value')
+    await user.keyboard('20')
+    await press('Contextual percentage')
+    expect(value()).toBe('20')
+    expect(fetchMock).not.toHaveBeenCalled()
+    await user.keyboard('=')
+
+    expect(requestBody()).toEqual({ operation: 'percentage', a: 150, b: 20 })
+    await waitFor(() => expect(value()).toBe('30'))
+
+    await user.keyboard('+5=')
+    expect(requestBody(1)).toEqual({ operation: 'add', a: 30, b: 5 })
+    await waitFor(() => expect(value()).toBe('35'))
+  })
+
+  it('keeps the contextual marker across modes and consumes it once per step in a chain', async () => {
+    fetchMock.mockResolvedValueOnce(reply(180)).mockResolvedValueOnce(reply(18))
+    const { press, user, value } = openCalculator()
+
+    await press('Advanced')
+    await user.keyboard('150+20')
+    await press('Contextual percentage')
+    expect(value()).toBe('20%')
+    expect(fetchMock).not.toHaveBeenCalled()
+
+    await press('Standard')
+    expect(screen.queryByRole('button', { name: 'Contextual percentage' })).toBeNull()
+    expect(value()).toBe('20%')
+    await user.keyboard('*')
+    await screen.findByText('180 ×')
+    expect(requestBody()).toEqual({ operation: 'add', a: 150, b: 20, percentage: true })
+    await user.keyboard('10')
+    expect(value()).toBe('10')
+
+    await press('Advanced')
+    await press('Contextual percentage')
+    await user.keyboard('=')
+    expect(requestBody(1)).toEqual({ operation: 'multiply', a: 180, b: 10, percentage: true })
+    await waitFor(() => expect(value()).toBe('18'))
+  })
+
+  it('toggles the marker, keeps it while editing, and clears it when the right operand is erased', async () => {
+    fetchMock.mockResolvedValueOnce(reply(104))
+    const { press, user, value } = openCalculator()
+
+    await press('Advanced')
+    await user.keyboard('100')
+    await press('Contextual percentage')
+    expect(value()).toBe('100')
+    await user.keyboard('+')
+    await press('Contextual percentage')
+    expect(value()).toBe('100')
+
+    await user.keyboard('2')
+    await press('Contextual percentage')
+    expect(value()).toBe('2%')
+    await press('Contextual percentage')
+    expect(value()).toBe('2')
+    await press('Contextual percentage')
+    await user.keyboard('5{Backspace}')
+    expect(value()).toBe('2%')
+    await user.keyboard('{Backspace}4')
+    expect(value()).toBe('4')
+    expect(fetchMock).not.toHaveBeenCalled()
+
+    await user.keyboard('=')
+    expect(requestBody()).toEqual({ operation: 'add', a: 100, b: 4 })
+    await waitFor(() => expect(value()).toBe('104'))
+  })
+
+  it('applies square root to the marked right operand before contextual evaluation', async () => {
+    fetchMock.mockResolvedValueOnce(reply(3)).mockResolvedValueOnce(reply(206))
+    const { press, user, value } = openCalculator()
+
+    await press('Advanced')
+    await user.keyboard('200+9')
+    await press('Contextual percentage')
+    await press('Square root')
+    expect(requestBody()).toEqual({ operation: 'sqrt', a: 9 })
+    await waitFor(() => expect(value()).toBe('3%'))
+    await user.keyboard('=')
+    expect(requestBody(1)).toEqual({ operation: 'add', a: 200, b: 3, percentage: true })
+    await waitFor(() => expect(value()).toBe('206'))
   })
 })

@@ -42,9 +42,9 @@ func calculate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4096))
-	var fields map[string]json.RawMessage
-	if err := decoder.Decode(&fields); err != nil || fields == nil || decoder.Decode(new(json.RawMessage)) != io.EOF {
-		writeError(w, http.StatusBadRequest, "INVALID_REQUEST", "Send a single valid JSON object.")
+	fields, ok := decodeFields(decoder)
+	if !ok {
+		writeError(w, http.StatusBadRequest, "INVALID_REQUEST", "Send a single valid JSON object with unique fields.")
 		return
 	}
 
@@ -76,8 +76,10 @@ func calculate(w http.ResponseWriter, r *http.Request) {
 		apply = calculator.Power
 	case "sqrt":
 		apply = func(a, _ float64) (float64, error) { return calculator.Sqrt(a) }
+	case "percentage":
+		apply = func(a, b float64) (float64, error) { return calculator.Percentage(operation, a, b) }
 	default:
-		writeError(w, http.StatusBadRequest, "INVALID_REQUEST", "Supported operations are add, subtract, multiply, divide, power, and sqrt.")
+		writeError(w, http.StatusBadRequest, "INVALID_REQUEST", "Supported operations are add, subtract, multiply, divide, power, sqrt, and percentage.")
 		return
 	}
 
@@ -98,12 +100,16 @@ func calculate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if percentage, present := fields["percentage"]; present {
-		if operation == "power" || operation == "sqrt" {
+		if operation == "power" || operation == "sqrt" || operation == "percentage" {
 			writeError(w, http.StatusBadRequest, "INVALID_REQUEST", "Omit percentage for this operation.")
 			return
 		}
-		if string(percentage) != "false" {
-			writeError(w, http.StatusBadRequest, "INVALID_REQUEST", "Omit percentage or set it to false.")
+		switch string(percentage) {
+		case "true":
+			apply = func(a, b float64) (float64, error) { return calculator.Percentage(operation, a, b) }
+		case "false":
+		default:
+			writeError(w, http.StatusBadRequest, "INVALID_REQUEST", "Percentage must be a boolean.")
 			return
 		}
 	}
@@ -131,6 +137,35 @@ func calculate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, successResponse{Result: result})
+}
+
+func decodeFields(decoder *json.Decoder) (map[string]json.RawMessage, bool) {
+	if token, err := decoder.Token(); err != nil || token != json.Delim('{') {
+		return nil, false
+	}
+	fields := make(map[string]json.RawMessage)
+	for decoder.More() {
+		token, err := decoder.Token()
+		key, ok := token.(string)
+		if err != nil || !ok {
+			return nil, false
+		}
+		if _, present := fields[key]; present {
+			return nil, false
+		}
+		var value json.RawMessage
+		if err := decoder.Decode(&value); err != nil {
+			return nil, false
+		}
+		fields[key] = value
+	}
+	if token, err := decoder.Token(); err != nil || token != json.Delim('}') {
+		return nil, false
+	}
+	if decoder.Decode(new(json.RawMessage)) != io.EOF {
+		return nil, false
+	}
+	return fields, true
 }
 
 func readNumber(raw json.RawMessage) (float64, bool) {

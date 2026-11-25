@@ -1,12 +1,12 @@
 type EntryAction =
   | { type: 'digit'; digit: string }
-  | { type: 'decimal' | 'sign' | 'backspace' }
+  | { type: 'decimal' | 'sign' | 'backspace' | 'togglePercentage' }
 
-export type Operation = 'add' | 'subtract' | 'multiply' | 'divide' | 'power'
+export type Operation = 'add' | 'subtract' | 'multiply' | 'divide' | 'power' | 'percentage'
 
 export type CalculatorAction = EntryAction | { type: Operation | 'sqrt' | 'equals' | 'clear' }
 
-type PendingOperation = { left: number; operation: Operation }
+type PendingOperation = { left: number; operation: Operation; percentage?: boolean }
 
 export type CalculatorState = {
   entry: string
@@ -57,9 +57,20 @@ export function calculatorReducer(state: CalculatorState, action: StateAction): 
         entry: state.entry.startsWith('-') ? state.entry.slice(1) : '-' + state.entry,
         error: null,
       }
-    case 'backspace':
+    case 'backspace': {
       if (state.result !== null) return state
-      return { ...state, entry: state.entry.slice(0, -1), error: null }
+      const entry = state.entry.slice(0, -1)
+      const pending = (entry === '' || entry === '-') && state.pending?.percentage
+        ? { ...state.pending, percentage: false }
+        : state.pending
+      return { ...state, entry, pending, error: null }
+    }
+    case 'togglePercentage': {
+      const { pending, entry, result } = state
+      if (pending === null || pending.operation === 'power' || pending.operation === 'percentage') return state
+      if (result === null && (entry === '' || entry.endsWith('.') || !Number.isFinite(Number(entry)))) return state
+      return { ...state, pending: { ...pending, percentage: !pending.percentage }, error: null }
+    }
     case 'setPending':
       return { ...initialState, pending: action.pending, entry: '' }
     case 'requestStarted':

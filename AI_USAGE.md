@@ -548,3 +548,145 @@ Tool — Codex (ChatGPT). Purpose — implement and verify square root as an imm
 - `npm.cmd run coverage` passed all 31 frontend tests with 98.36% line, 96.21% statement, and 93.28% branch coverage. `npm.cmd run build` passed TypeScript checking and the Vite build.
 - Started the compiled Go API and Vite. `npm.cmd run test:smoke` passed both existing browser scenarios. A separate real-browser check verified no request for an empty right operand, preserved addition across a mode switch, sent the full `sqrt(2)` value to Go, and recovered from `INVALID_SQRT` by correcting `-9` to `9`.
 - `git -c core.whitespace=cr-at-eol diff --check` passed. No commit or push was made.
+
+## 2026-11-25 — Percentage operation review
+
+Tool — Codex (ChatGPT). Purpose — review direct and contextual percentage behavior, state, API, and focused tests before implementation.
+
+### Prompt
+
+> Review percentage as the next advanced calculator operation
+>
+> Check SPEC.md and the current implementation before making changes
+>
+> We need to support both direct and contextual percentages, following the behavior already defined in the spec
+>
+> Review how percentages should work with addition, subtraction, multiplication and division, including chained calculations
+>
+> Check how percentage should interact with the current reducer, pending operations, numeric precision and mode switching
+>
+> Identify any missing edge cases, API contract details and relevant tests
+>
+> Keep the existing architecture and avoid unnecesary refactoring
+>
+> Report the decisions that need my approval before implementation
+
+### Outcome and checks
+
+- Read the approved spec, Go dispatch and validation, React pending state and request flow, and relevant tests. Direct percentage fits as a binary operation with the base in `a` and rate in `b`. Contextual percentage fits as a flag on the pending standard operation.
+- Pending recommendations are two Advanced controls, a base-first direct percentage, and a contextual marker that toggles on repeated press, stays with an edited operand or through mode switches, clears when that operand is erased, and is consumed by a successful calculation. Square root would transform the operand before the marker is applied.
+- Recommend supporting signed, fractional, and greater-than-100 rates. The context modifier should be allowed only for the four standard operations as a boolean. Either sign of zero as the actual contextual divisor should retain `DIVISION_BY_ZERO`. Recommend avoiding preventable intermediate overflow and avoiding zero-divisor classification for a nonzero rate that rounds to zero when scaled.
+- Checked the four spec examples, the `150 + 20% × 10% = 18` chain, a preventable overflow, and a tiny nonzero rate using Node arithmetic. Recommended representative Go, HTTP, and React cases. No application code, spec, or tests were changed, and no test suites were run.
+
+## 2026-11-25 — Direct and contextual percentages
+
+Tool — Codex (ChatGPT). Purpose — implement and verify the approved percentage behavior.
+
+### Prompt
+
+> Proceed with the percentage implementation following the reviewed approach
+>
+> I approve the two Advanced mode controls, direct percentage using percentage as the operation and contextual percentage using the boolean modifier
+>
+> Keep the agreed operand order, marker behavior and left to right evaluation
+>
+> Support signed and fractional percentages, values above 100 and preserve full numeric precision for chained operations
+>
+> Handle overflow, underflow and division by zero correctly, avoid intermediate calculations producing incorrect results when the final result is valid
+>
+> Keep the existing API contracts and reject invalid percentage modifiers with HTTP 400
+>
+> Reuse the current reducer and request flow, avoid unnecesary changes to the architecture
+>
+> Implement the discussed Go, HTTP and React tests, including direct percentages, contextual chains, marker behavior and mode switching
+>
+> Run all relevant tests, coverage checks, builds and the browser smoke test. Report the actual results and any limitations
+
+### Decisions and outcome
+
+- Ramiro approved both controls from the [percentage operation review](#2026-11-25--percentage-operation-review). Direct percentage takes the base first and the rate second. Contextual percentage uses a boolean on the four standard operations only.
+- Added the two Advanced controls and kept the marker on the pending operation. It survives edits, square root, failure, and mode switches, and is removed when the operand is erased, the pending operation succeeds, or Clear is pressed. Calculation chaining and full returned precision use the existing workflow.
+- Percentage operations use Go's standard library rational arithmetic for exact intermediates of the received float64 operands, then round to float64 once. This avoids preventable intermediate overflow and underflow, while a final underflow can still round to zero. Both signs of zero as a contextual divisor return `DIVISION_BY_ZERO`. A non-finite final result returns `NON_FINITE_RESULT`.
+- Updated the API validation, focused Go and React tests, specification, and README. The first TypeScript build exposed an action-union narrowing error. Moved the percentage toggle into the shared entry-action variants and reran the frontend checks.
+
+### Checks run
+
+- On Windows with Go 1.25.0, `go test -count=1 -coverpkg=./... -coverprofile=coverage.out ./...`, `go tool cover -func=coverage.out`, `go vet ./...`, and `go build -o ../.tooling/calculator-api-percentage.exe .` passed. Go coverage was 93.3% overall and 97.6% for the HTTP package.
+- `npm.cmd run coverage` passed all 35 frontend tests, with 98.47% line, 96.50% statement, and 94.15% branch coverage. `npm.cmd run build` passed TypeScript checking and the Vite production build after the type fix.
+- Started the compiled Go API and Vite and ran `npm.cmd run test:smoke`. Both checked-in scenarios passed. A separate Chromium spot check against the real API verified base-first direct percentage, the contextual chain across modes, an unrounded percentage quotient in the next request, and correction of a zero rate. The spot check used a 320 CSS pixel viewport.
+- `git -c core.whitespace=cr-at-eol diff --check` passed. No commit or push was made.
+
+## 2026-11-25 — Complete calculator submission review
+
+Tool — Codex (ChatGPT). Purpose — review the working calculator against the assessment and approved specification before submission.
+
+### Prompt
+
+> Review the complete calculator implementation against ASSESSMENT.md and SPEC.md
+>
+> Check that all required and advanced operations behave correctly, including validation, numeric edge cases, precision, error recovery and mode switching
+>
+> Review the frontend and backend architecture for correctness, maintainability and unnecessary complexity
+>
+> Evaluate the existing tests and identify any important coverage gaps, avoid adding tests just to increase coverage numbers
+>
+> Check the API contracts, keyboard interactions, responsive layout, accessibility and browser behavior
+>
+> Review README.md and AI_USAGE.md for completeness and technical consistency
+>
+> Identify any issues that should be fixed before submission, prioritize them by severity and explain the impact
+>
+> Dont implement changes yet, I want to review your findings first
+>
+> Update AI_USAGE.md with the review and dont commit or push
+
+### Findings and recommendations
+
+- Reviewed the working tree at `700ddc0` plus local percentage changes. All seven operations and both percentage flows are present. Found no blocker in ordinary calculations, domain validation, precision or error recovery. The separation between the pure reducer, request hook, HTTP client, Go handler, and arithmetic is appropriate. Percentage arithmetic uses standard-library rational intermediates for the documented numeric boundary cases.
+- Submission prerequisite — Percentage changes are local, and `backend/internal/calculator/percentage.go` was untracked. Include the complete implementation and log in the submission so the published tree builds, and verify Ubuntu CI on the final revision.
+- Medium — The keypad renders subtraction, multiplication, and division before the digit rows in DOM order. In Chromium, Tab proceeded through these operators and then jumped back up to 7. Match source order to the visible rows and verify a representative keyboard path without counting Tab presses.
+- Low — Go accepts duplicate keys with the last value winning. A request with `"percentage":"true","percentage":false` returned 200 with result 5, masking the earlier invalid value. Decide whether to reject duplicates or document the current behavior. The success test helper also accepts `{"result":null}` for expected zero because it decodes into `map[string]float64`. Assert an actual JSON number. Add one advanced scenario to the checked-in real-stack smoke test, such as contextual division-by-zero correction across a mode switch. Retain mocked deferred requests for race and network-failure tests.
+- The README covers setup, proxying, API requests, tests, coverage, and design. Clarify binary versus unary operands, add the PowerShell-safe coverage command, and link the prompt log for the evaluator. Earlier log wording about an operand array is historical and differs from the current named `a` and `b` fields. Preserve historical prompts and annotate the distinction. The log records staged decisions and checks. Completeness outside the available conversation cannot be verified. Include any separately recorded assessment prompts or identify gaps at submission.
+
+### Checks run
+
+- Native Windows Go 1.27.4 passed `go test -count=1 -coverpkg=./... '-coverprofile=coverage.out' ./...`, `go tool cover '-func=coverage.out'`, `go vet ./...`, and `go build -o ../.tooling/calculator-api-review.exe .`. Coverage was 93.3% overall, 90.9% for the calculator package, and 97.6% for HTTP. PowerShell split the unquoted filename arguments on the first attempts, so both coverage commands were rerun with quotes. Windows application control blocked direct launch of the built file. `go run .` started the current API.
+- `npm.cmd run coverage` passed 35 tests, with 96.50% statement, 94.15% branch, and 98.47% line coverage for calculator code. `npm.cmd run build` passed TypeScript and the production build. Both coverage files were present.
+- With the API and `npm.cmd run dev -- --host 127.0.0.1 --strictPort` running, `npm.cmd run test:smoke` passed both standard scenarios. An additional transient Chromium probe at 320 CSS pixels verified touch, visible focus, the Tab order issue, no page-level horizontal overflow, decimal formatting, power and square root in a mixed chain across mode switches, direct percentage, and contextual division-by-zero recovery. It also verified the maximum finite result displays in scientific notation and is sent at full precision into the next calculation. Live HTTP probes verified subnormal arithmetic, `0^0`, negative square root, a null modifier, and a contextual negative-zero divisor.
+- Browser checks used headless Chromium with touch emulation. No physical device, screen reader, or other browser engine was checked. Ubuntu CI configuration was reviewed locally. No hosted run was triggered for the local percentage working tree.
+- Only this log was edited during the review. No commits or pushes were made.
+
+## 2026-11-25 — Submission review fixes
+
+Tool — Codex (ChatGPT). Purpose — address the approved keypad, API contract, browser verification, and documentation findings.
+
+### Prompt
+
+> Address the issues identified in the final review
+>
+> Fix the keypad DOM order so Tab navigation follows the visual layout
+>
+> Reject duplicate JSON fields with HTTP 400 and improve the HTTP success assertions to verify result is a valid JSON number
+>
+> Extend the browser smoke test with a contextual percentage scenario covering mode switching and recovery after division by 0%
+>
+> Update README.md with the correct API requirements, testing instructions and AI_USAGE.md reference
+>
+> Keep the existing architecture and behavior unchanged, avoid unnecesary refactoring
+>
+> Run all relevant tests, coverage checks, builds and browser smoke tests
+
+### Decisions and outcome
+
+- Rendered the keypad in visual row order and removed the CSS rules that moved buttons across rows. Extended the React keyboard regression to assert the transition from Add to the next two rows and activate a focused digit.
+- The Go handler now reads object members in order, rejecting duplicate decoded keys as HTTP 400 with `INVALID_REQUEST`. The HTTP tests cover duplicate operations, escaped aliases, and modifiers that previously hid an invalid value. Success tests assert that `result` is a JSON number, including for zero.
+- Extended the real-stack smoke test to mark `150 ÷ 0%` in Advanced mode, confirm the HTTP 422 error in Standard mode, then switch back to Advanced and correct the rate to 20%. The test checks that both requests carry the modifier and that the final result is 750 with the marker removed.
+- The README distinguishes unary and binary operands, documents the modifier and duplicates, gives PowerShell-safe coverage commands, describes all three smoke scenarios, and links this log. The earlier operand-array reference in the [calculator behavior and API specification entry](#2026-11-24--calculator-behavior-and-api-specification) is historical. The implemented API uses named `a` and `b` fields.
+
+### Checks run
+
+- On Windows, `go test -count=1 -coverpkg=./... '-coverprofile=coverage.out' ./...` passed the arithmetic package but Windows application control blocked `httpapi.test.exe` on both Go 1.27.4 and Go 1.25.0. `go vet ./...` and `go build -o ../.tooling/calculator-api-review-fixes-go125.exe .` passed with Go 1.25.0. Vet and a native build also passed with Go 1.27.4. `go run .` started the API for browser verification.
+- The complete Go suite passed under Node using `GOOS=js GOARCH=wasm`. For coverage, the stock WebAssembly runner hit the Node/Windows `O_DIRECTORY` limitation. Using Go 1.25.0's installed runner plus a local Node preload in ignored `.tooling`, ran `go test -count=1 -coverpkg=./... '-coverprofile=../.tooling/review-fixes-wasm/coverage.out' "-exec=node --require $fixWasmDir/windows-directory.cjs $fixWasmDir/wasm_exec_node.js" ./...`, where `$fixWasmDir` is the absolute path to that tooling directory. `go tool cover '-func=../.tooling/review-fixes-wasm/coverage.out'` reported 92.8% overall, 90.9% for arithmetic, and 96.1% for HTTP. The Windows application policy and Go installation were untouched.
+- `npm.cmd run coverage` passed all 35 React tests with 96.50% statement, 94.08% branch, and 98.46% line coverage. The initial TypeScript run caught unsupported Testing Library locator options. After removing them, `npm.cmd run build` passed TypeScript and Vite, and `node --check scripts/browser-smoke.mjs` passed.
+- With Vite started using `npm.cmd run dev -- --host 127.0.0.1 --strictPort`, `npm.cmd run test:smoke` passed all three Chromium scenarios against the running Go API. A separate Chromium probe checked every visual keypad position against the actual Tab order in both modes at 320 and 1024 CSS pixels. A live request with duplicate percentage fields returned 400 and `INVALID_REQUEST`.
+- `git -c core.whitespace=cr-at-eol -c core.safecrlf=false diff --check` passed. No commits or pushes were made, and no hosted CI run was triggered.

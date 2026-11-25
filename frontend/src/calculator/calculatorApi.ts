@@ -1,7 +1,7 @@
 import type { Operation } from './calculatorReducer'
 
 export type CalculationRequest =
-  | { operation: Operation; a: number; b: number }
+  | { operation: Operation; a: number; b: number; percentage?: boolean }
   | { operation: 'sqrt'; a: number }
 
 export async function requestCalculation(calculation: CalculationRequest, signal: AbortSignal): Promise<number> {

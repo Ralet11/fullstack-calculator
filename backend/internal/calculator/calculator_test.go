@@ -209,3 +209,53 @@ func TestSqrtRejectsNegativeOperand(t *testing.T) {
 		t.Errorf("Sqrt(-1) error = %v; want ErrInvalidSqrt", err)
 	}
 }
+
+func TestPercentage(t *testing.T) {
+	for _, test := range []struct {
+		name, operation     string
+		base, percent, want float64
+	}{
+		{"direct", "percentage", 150, 20, 30},
+		{"signed fractional rate", "percentage", 80, -12.5, -10},
+		{"rate over 100", "percentage", 8, 150, 12},
+		{"contextual addition", "add", 150, 20, 180},
+		{"contextual subtraction", "subtract", 150, 20, 120},
+		{"contextual multiplication", "multiply", 150, 20, 30},
+		{"contextual division", "divide", 150, 20, 750},
+		{"zero rate", "multiply", 150, 0, 0},
+		{"zero base", "divide", 0, 20, 0},
+		{"large finite direct result", "percentage", 1e308, 100, 1e308},
+		{"finite after negative adjustment", "add", 1e308, -200, -1e308},
+		{"finite after subtraction", "subtract", 1e308, 200, -1e308},
+		{"tiny rate times a larger base", "multiply", 100, math.SmallestNonzeroFloat64, math.SmallestNonzeroFloat64},
+		{"nonzero rate too small to scale in float64", "divide", math.SmallestNonzeroFloat64, math.SmallestNonzeroFloat64, 100},
+		{"tiny dividend with a nonzero result", "divide", math.SmallestNonzeroFloat64, 50, 2 * math.SmallestNonzeroFloat64},
+		{"final result rounds to zero", "percentage", math.SmallestNonzeroFloat64, 1, 0},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			got, err := Percentage(test.operation, test.base, test.percent)
+			if err != nil || got != test.want {
+				t.Fatalf("Percentage(%q, %g, %g) = %g, %v; want %g", test.operation, test.base, test.percent, got, err, test.want)
+			}
+		})
+	}
+}
+
+func TestPercentageErrors(t *testing.T) {
+	for _, test := range []struct {
+		name, operation string
+		base, percent   float64
+		want            error
+	}{
+		{"zero divisor", "divide", 150, 0, ErrDivisionByZero},
+		{"negative zero divisor", "divide", 150, math.Copysign(0, -1), ErrDivisionByZero},
+		{"direct result overflow", "percentage", 1e308, 200, ErrNonFiniteResult},
+		{"nonzero tiny divisor overflows", "divide", 1, math.SmallestNonzeroFloat64, ErrNonFiniteResult},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			if _, err := Percentage(test.operation, test.base, test.percent); !errors.Is(err, test.want) {
+				t.Errorf("Percentage(%q, %g, %g) error = %v; want %v", test.operation, test.base, test.percent, err, test.want)
+			}
+		})
+	}
+}

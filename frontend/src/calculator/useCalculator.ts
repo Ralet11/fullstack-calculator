@@ -52,6 +52,7 @@ export function useCalculator() {
       case 'decimal':
       case 'sign':
       case 'backspace':
+      case 'togglePercentage':
         dispatch(action)
         return
     }
@@ -76,7 +77,12 @@ export function useCalculator() {
     if (action.type === 'sqrt') {
       void calculate({ operation: 'sqrt', a: value })
     } else if (pending !== null) {
-      void calculate({ operation: pending.operation, a: pending.left, b: value }, nextOperation)
+      void calculate({
+        operation: pending.operation,
+        a: pending.left,
+        b: value,
+        ...(pending.percentage ? { percentage: true } : {}),
+      }, nextOperation)
     } else if (nextOperation !== null) {
       dispatch({ type: 'setPending', pending: { left: value, operation: nextOperation } })
     }
