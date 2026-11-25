@@ -1,6 +1,6 @@
 # Calculator
 
-A React and TypeScript calculator with a Go JSON API. It supports addition, subtraction, multiplication, and division with negative and decimal operands. Mixed chains evaluate from left to right. Advanced mode adds square root, power, and both percentage controls.
+A React and TypeScript calculator with a Go JSON API. It supports addition, subtraction, multiplication, and division with negative and decimal operands. Mixed chains evaluate from left to right. Advanced mode adds square root, power, and a contextual `%` key.
 
 ## Run locally
 
@@ -44,26 +44,30 @@ The response is HTTP 200 with `{"result":40}`. Send one JSON object containing a
 
 Invalid requests, including duplicate or unknown fields, return HTTP 400 with `INVALID_REQUEST`. Calculation errors return HTTP 422. Division by either sign of zero returns `{"error":{"code":"DIVISION_BY_ZERO","message":"Division by zero is not allowed."}}`. Overflow uses `NON_FINITE_RESULT`. A negative base with a fractional exponent or zero with a negative exponent uses `INVALID_POWER`. A negative square root operand uses `INVALID_SQRT`. For example, `{"operation":"power","a":2,"b":3}` returns `{"result":8}` and `{"operation":"sqrt","a":81}` returns `{"result":9}`.
 
-For 20% of 150, enter `150`, press **Percent of value**, enter `20`, and evaluate. The API receives `{"operation":"percentage","a":150,"b":20}` and returns `{"result":30}`. For `150 + 20%`, press **%** after entering `20`. Evaluation sends `{"operation":"add","a":150,"b":20,"percentage":true}` and returns `{"result":180}`.
+For 20% of 150, enter `150 × 20`, press **%**, and evaluate. The API receives `{"operation":"multiply","a":150,"b":20,"percentage":true}` and returns `{"result":30}`. API clients can also send `{"operation":"percentage","a":150,"b":20}` for the same result. For `150 + 20%`, press **%** after entering `20`. Evaluation sends `{"operation":"add","a":150,"b":20,"percentage":true}` and returns `{"result":180}`.
 
 ## Tests and coverage
 
-From `frontend/`:
+From `frontend/`, install dependencies from the lockfile, run the React suite with coverage, and check the production build.
 
 ```sh
-npm test
+npm ci
 npm run coverage
 npm run build
 ```
 
-Frontend coverage is also written to `frontend/coverage/index.html`. From `backend/`:
+Frontend coverage is printed in the terminal and written to `frontend/coverage/index.html`. From `backend/`:
 
 ```sh
 go test -count=1 -coverpkg=./... '-coverprofile=coverage.out' ./...
 go tool cover '-func=coverage.out'
 go vet ./...
-go build ./...
+go build -o calculator-api .
 ```
+
+On pull requests and pushes to `main`, GitHub Actions runs both sets of checks in separate Ubuntu jobs. The frontend uses Node 24 and the backend uses the version in `backend/go.mod`. Run the browser smoke test separately with both services running. [CI workflow](.github/workflows/backend.yml)
+
+The local assessment run passed 56 React tests with 91.78% line and 85.54% branch coverage. The Go suite reported 92.8% statement coverage. See the [assessment verification report](docs/VERIFICATION.md) for toolchain details and browser results.
 
 ## Browser smoke test
 
@@ -74,7 +78,7 @@ npx playwright-core install --only-shell chromium
 npm run test:smoke
 ```
 
-The script drives Chromium through the running React app and checks the real Go responses for `1 ÷ 3 × 3 = 1`, correction of `8 ÷ 0` to `8 ÷ 2 = 4`, and correction of `150 ÷ 0%` to `150 ÷ 20% = 750` with mode switches. It uses `http://127.0.0.1:5173` by default. If Vite uses another port, pass its URL with `npm run test:smoke -- http://127.0.0.1:5174`. On Linux, `npx playwright-core install --with-deps --only-shell chromium` also installs the browser's system dependencies.
+The script drives Chromium through the running React app and checks the real Go responses for `1 ÷ 3 × 3 = 1`, correction of `8 ÷ 0` to `8 ÷ 2 = 4`, correction of `150 ÷ 0%` to `150 ÷ 20% = 750` with mode switches, and `150 × 20% = 30`. It uses `http://127.0.0.1:5173` by default. If Vite uses another port, pass its URL with `npm run test:smoke -- http://127.0.0.1:5174`. On Linux, `npx playwright-core install --with-deps --only-shell chromium` also installs the browser's system dependencies.
 
 ## Design
 

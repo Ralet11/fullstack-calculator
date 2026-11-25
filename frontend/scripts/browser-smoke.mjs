@@ -10,6 +10,11 @@ try {
   page.setDefaultTimeout(10_000)
   await page.goto('/')
   const button = name => page.getByRole('button', { name, exact: true })
+  async function selectMode(name) {
+    await button('Modes').click()
+    await button(name).click()
+  }
+
   const display = page.getByRole('status', { name: 'Calculator display' })
   const expectDisplay = value => display.and(page.getByText(value, { exact: true })).waitFor()
 
@@ -58,12 +63,12 @@ try {
   console.log('PASS 8 ÷ 0 shows the Go error, then correcting the divisor to 2 gives 4')
 
   await button('Clear').click()
-  await button('Advanced').click()
+  await selectMode('Advanced')
   for (const name of ['1', '5', '0', 'Divide', '0', 'Contextual percentage']) {
     await button(name).click()
   }
   await expectDisplay('0%')
-  await button('Standard').click()
+  await selectMode('Standard')
   await button('Contextual percentage').waitFor({ state: 'hidden' })
   await expectDisplay('0%')
 
@@ -74,7 +79,7 @@ try {
   await alert.and(page.getByText(percentageError.message, { exact: true })).waitFor()
   await expectDisplay('0%')
 
-  await button('Advanced').click()
+  await selectMode('Advanced')
   await page.getByRole('button', { name: 'Contextual percentage', pressed: true }).waitFor()
   await alert.waitFor()
   await button('2').click()
@@ -88,6 +93,56 @@ try {
   await alert.waitFor({ state: 'hidden' })
   await page.getByRole('button', { name: 'Contextual percentage', pressed: false }).waitFor()
   console.log('PASS 150 ÷ 0% preserves the marker across modes and correcting the rate to 20% gives 750')
+
+  await button('Percent of value').waitFor({ state: 'hidden' })
+  await button('Clear').click()
+  for (const name of ['1', '5', '0', 'Multiply', '2', '0', 'Contextual percentage']) {
+    await button(name).click()
+  }
+  await expectDisplay('20%')
+  assert.deepEqual(
+    await pressCalculation('Equals', { operation: 'multiply', a: 150, b: 20, percentage: true }),
+    { result: 30 },
+  )
+  await expectDisplay('30')
+  console.log('PASS 150 × 20% = 30 using the single percentage key')
+
+  await page.setViewportSize({ width: 375, height: 650 })
+  const historyButton = button('History')
+  await historyButton.click()
+  const drawer = page.getByRole('dialog', { name: 'Recent calculations' })
+  await drawer.waitFor()
+  const entries = drawer.getByRole('listitem')
+  assert.match(await entries.first().textContent(), /150 × 20%.*30/)
+  assert.match(await entries.nth(1).textContent(), /150 ÷ 20%.*750/)
+  await drawer.getByRole('button', { name: 'Close', exact: true }).and(page.locator(':focus')).waitFor()
+  await page.keyboard.press('Tab')
+  await drawer.getByRole('button', { name: 'Clear history', exact: true }).and(page.locator(':focus')).waitFor()
+  await page.keyboard.press('Tab')
+  await drawer.getByRole('button', { name: 'Close', exact: true }).and(page.locator(':focus')).waitFor()
+  await page.keyboard.press('Escape')
+  await drawer.waitFor({ state: 'hidden' })
+  await historyButton.and(page.locator(':focus')).waitFor()
+  await expectDisplay('30')
+  console.log('PASS mobile history shows the latest live calculation, wraps Tab, and restores focus on Escape')
+
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await display.focus()
+  for (const name of ['Power', 'Square root', 'Contextual percentage', 'Clear']) {
+    await page.keyboard.press('Tab')
+    await button(name).and(page.locator(':focus')).waitFor()
+    if (name === 'Power') await page.getByRole('tooltip').waitFor()
+  }
+  await button('Power').hover()
+  await page.getByRole('tooltip').waitFor()
+  await button('1').click()
+  await expectDisplay('1')
+  await button('Power').hover()
+  await page.getByRole('tooltip').waitFor()
+  await page.keyboard.press('Escape')
+  await page.getByRole('tooltip').waitFor({ state: 'hidden' })
+  await expectDisplay('1')
+  console.log('PASS Advanced tooltip leaves number keys clickable and Escape preserves the input')
 } finally {
   await browser.close()
 }

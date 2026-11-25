@@ -1,0 +1,140 @@
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.modePicker {
+  position: relative;
+  min-width: 0;
+}
+
+.modes,
+.history,
+.options button {
+  min-height: var(--control-min);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  padding: var(--space-1) var(--space-2);
+  color: var(--ink);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.modes,
+.history {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  background: transparent;
+}
+
+[data-size="Large"] .modes,
+[data-size="Large"] .history {
+  font-size: clamp(var(--text-sm), 2.15vmin, 1.25rem);
+}
+
+.history {
+  color: var(--muted);
+}
+
+.modes[aria-expanded="true"],
+.history[aria-expanded="true"],
+.options button[aria-pressed="true"] {
+  background: var(--operator);
+  color: var(--operator-ink);
+}
+
+@media (hover: hover) {
+  .modes[aria-expanded="false"]:hover,
+  .history[aria-expanded="false"]:hover,
+  .options button[aria-pressed="false"]:hover {
+    background: var(--utility-hover);
+  }
+}
+
+.modes:active,
+.history:active,
+.options button:active {
+  border-color: var(--operator-edge);
+}
+
+.hamburger,
+.clock {
+  position: relative;
+  display: inline-block;
+  width: 1rem;
+  flex: 0 0 auto;
+}
+
+.hamburger {
+  height: 0.75rem;
+  border-block: 2px solid currentColor;
+}
+
+.hamburger::after,
+.clock::after {
+  position: absolute;
+  content: '';
+}
+
+.hamburger::after {
+  inset: 3px 0 auto;
+  border-top: 2px solid currentColor;
+}
+
+.clock {
+  height: 1rem;
+  border: 1.5px solid currentColor;
+  border-radius: 50%;
+}
+
+.clock::after {
+  top: 3px;
+  left: 6px;
+  width: 4px;
+  height: 5px;
+  border: solid currentColor;
+  border-width: 0 0 1.5px 1.5px;
+}
+
+.options {
+  position: absolute;
+  z-index: 3;
+  inset: calc(100% + var(--space-1)) auto auto 0;
+  min-width: 10rem;
+  padding: var(--space-1);
+  border: 1px solid var(--edge);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: var(--shadow-tooltip);
+}
+
+.options button {
+  display: flex;
+  width: 100%;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-3);
+  padding-inline: var(--space-3);
+  background: transparent;
+}
+
+.sizeOptions {
+  margin-top: var(--space-1);
+  padding-top: var(--space-1);
+  border-top: 1px solid var(--edge);
+}
+
+.optionsLabel {
+  margin: var(--space-1) var(--space-3);
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+
+.check {
+  color: var(--operator-ink);
+}

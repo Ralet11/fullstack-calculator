@@ -1,11 +1,12 @@
 import { Fragment } from 'react'
+import { CalculatorAdvanced } from './CalculatorAdvanced'
 import type { CalculatorAction } from './calculatorReducer'
 import styles from './CalculatorKeypad.module.css'
 
 type Props = {
   advanced: boolean
-  loading: boolean
   percentageMarked: boolean
+  loading: boolean
   onAction: (action: CalculatorAction) => void
 }
 
@@ -17,7 +18,8 @@ const numberRows = [
 
 export function CalculatorKeypad({ advanced, loading, percentageMarked, onAction }: Props) {
   return (
-    <div className={styles.keypad}>
+    <div className={styles.keypad} data-calculator-keys>
+      {advanced && <CalculatorAdvanced keyClassName={styles.advancedKey} loading={loading} percentageMarked={percentageMarked} onAction={onAction} />}
       <button type="button" className={styles.utility} onClick={() => onAction({ type: 'clear' })} aria-label="Clear">C</button>
       <button type="button" className={styles.utility} disabled={loading} onClick={() => onAction({ type: 'sign' })} aria-label="Toggle sign">±</button>
       <button type="button" className={styles.utility} disabled={loading} onClick={() => onAction({ type: 'backspace' })} aria-label="Backspace">⌫</button>
@@ -37,46 +39,6 @@ export function CalculatorKeypad({ advanced, loading, percentageMarked, onAction
       <button type="button" className={styles.zero} disabled={loading} onClick={() => onAction({ type: 'digit', digit: '0' })}>0</button>
       <button type="button" disabled={loading} onClick={() => onAction({ type: 'decimal' })} aria-label="Decimal point">.</button>
       <button type="button" className={styles.equals} disabled={loading} onClick={() => onAction({ type: 'equals' })} aria-label="Equals">=</button>
-      {advanced && (
-        <>
-          <button
-            type="button"
-            className={`${styles.operator} ${styles.advancedOperator}`}
-            disabled={loading}
-            onClick={() => onAction({ type: 'power' })}
-            aria-label="Power"
-          >
-            xʸ
-          </button>
-          <button
-            type="button"
-            className={`${styles.operator} ${styles.advancedOperator}`}
-            disabled={loading}
-            onClick={() => onAction({ type: 'sqrt' })}
-            aria-label="Square root"
-          >
-            √
-          </button>
-          <button
-            type="button"
-            className={`${styles.operator} ${styles.advancedOperator} ${styles.percentOfValue}`}
-            disabled={loading}
-            onClick={() => onAction({ type: 'percentage' })}
-          >
-            Percent of value
-          </button>
-          <button
-            type="button"
-            className={`${styles.operator} ${styles.advancedOperator}`}
-            disabled={loading}
-            onClick={() => onAction({ type: 'togglePercentage' })}
-            aria-label="Contextual percentage"
-            aria-pressed={percentageMarked}
-          >
-            %
-          </button>
-        </>
-      )}
     </div>
   )
 }

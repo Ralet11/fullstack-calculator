@@ -1,0 +1,55 @@
+.key {
+  position: relative;
+  display: flex;
+  min-width: 0;
+}
+
+.key button {
+  width: 100%;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.tooltip {
+  position: absolute;
+  z-index: 1;
+  inset-block-end: 100%;
+  inset-inline-start: 0;
+  width: min(13rem, 65vw);
+  padding-block-end: var(--space-1);
+  pointer-events: none;
+}
+
+@media (min-width: 60rem), (min-width: 42rem) and (max-height: 36rem) {
+  [data-size="Large"] .tooltip {
+    inset-inline: auto 0;
+    width: min(19rem, 46vw);
+  }
+
+  [data-size="Large"] .tooltip > span {
+    padding-block: var(--space-1);
+    line-height: 1.35;
+  }
+}
+
+.tooltip[data-hovered="true"] {
+  pointer-events: auto;
+}
+
+.percentageKey {
+  grid-column: span 2;
+}
+
+.percentageKey .tooltip {
+  inset-inline: auto 0;
+}
+
+.tooltip > span {
+  display: block;
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-3);
+  background: var(--display);
+  color: var(--display-ink);
+  font-size: var(--text-sm);
+  box-shadow: var(--shadow-tooltip);
+}

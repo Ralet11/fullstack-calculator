@@ -1,5 +1,8 @@
+import { editableDecimal } from './calculatorEntry'
+
 type EntryAction =
   | { type: 'digit'; digit: string }
+  | { type: 'paste'; entry: string }
   | { type: 'decimal' | 'sign' | 'backspace' | 'togglePercentage' }
 
 export type Operation = 'add' | 'subtract' | 'multiply' | 'divide' | 'power' | 'percentage'
@@ -36,13 +39,15 @@ export function calculatorReducer(state: CalculatorState, action: StateAction): 
   switch (action.type) {
     case 'clear':
       return initialState
+    case 'paste':
+      return { ...state, entry: action.entry, result: null, error: null }
     case 'digit': {
-      const entry = state.result === null ? state.entry : ''
+      const entry = state.result === null ? editableDecimal(state.entry) : ''
       const prefix = entry === '0' ? '' : entry === '-0' ? '-' : entry
       return { ...state, entry: prefix + action.digit, result: null, error: null }
     }
     case 'decimal': {
-      const entry = state.result === null ? state.entry : ''
+      const entry = state.result === null ? editableDecimal(state.entry) : ''
       if (entry.includes('.')) return state
       const prefix = entry === '' || entry === '-' ? entry + '0' : entry
       return { ...state, entry: prefix + '.', result: null, error: null }
@@ -59,7 +64,7 @@ export function calculatorReducer(state: CalculatorState, action: StateAction): 
       }
     case 'backspace': {
       if (state.result !== null) return state
-      const entry = state.entry.slice(0, -1)
+      const entry = editableDecimal(state.entry).slice(0, -1)
       const pending = (entry === '' || entry === '-') && state.pending?.percentage
         ? { ...state.pending, percentage: false }
         : state.pending

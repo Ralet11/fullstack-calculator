@@ -1,9 +1,15 @@
-import { useEffect, useReducer, useRef } from 'react'
+import { useEffect, useReducer, useRef, useState } from 'react'
 import { requestCalculation, type CalculationRequest } from './calculatorApi'
 import { calculatorReducer, initialState, type CalculatorAction, type Operation } from './calculatorReducer'
 
-export function useCalculator() {
+const loadingDelay = 250
+
+type Evaluation = { request: CalculationRequest; result: number | null }
+
+export function useCalculator(onEvaluated: (request: CalculationRequest, result: number) => void) {
   const [state, dispatch] = useReducer(calculatorReducer, initialState)
+  const [evaluation, setEvaluation] = useState<Evaluation | null>(null)
+  const [showLoading, setShowLoading] = useState(false)
   const activeRequest = useRef<AbortController | null>(null)
 
   useEffect(() => {
@@ -17,11 +23,20 @@ export function useCalculator() {
   async function calculate(calculation: CalculationRequest, nextOperation: Operation | null = null) {
     const request = new AbortController()
     activeRequest.current = request
+    setEvaluation({ request: calculation, result: null })
     dispatch({ type: 'requestStarted' })
+
+    const loadingTimer = window.setTimeout(() => {
+      if (activeRequest.current === request) setShowLoading(true)
+    }, loadingDelay)
+    const stopLoadingTimer = () => window.clearTimeout(loadingTimer)
+    request.signal.addEventListener('abort', stopLoadingTimer, { once: true })
 
     try {
       const result = await requestCalculation(calculation, request.signal)
       if (activeRequest.current === request) {
+        setEvaluation({ request: calculation, result })
+        onEvaluated(calculation, result)
         dispatch(calculation.operation === 'sqrt'
           ? { type: 'unarySucceeded', result }
           : { type: 'requestSucceeded', result, nextOperation })
@@ -32,7 +47,12 @@ export function useCalculator() {
         dispatch({ type: 'requestFailed', message })
       }
     } finally {
-      if (activeRequest.current === request) activeRequest.current = null
+      stopLoadingTimer()
+      request.signal.removeEventListener('abort', stopLoadingTimer)
+      if (activeRequest.current === request) {
+        activeRequest.current = null
+        setShowLoading(false)
+      }
     }
   }
 
@@ -41,6 +61,8 @@ export function useCalculator() {
       const request = activeRequest.current
       activeRequest.current = null
       request?.abort()
+      setEvaluation(null)
+      setShowLoading(false)
       dispatch({ type: 'clear' })
       return
     }
@@ -49,10 +71,14 @@ export function useCalculator() {
 
     switch (action.type) {
       case 'digit':
+      case 'paste':
       case 'decimal':
       case 'sign':
       case 'backspace':
       case 'togglePercentage':
+        if (evaluation?.result === null || (action.type === 'sign' && state.result !== null)) {
+          setEvaluation(null)
+        }
         dispatch(action)
         return
     }
@@ -88,5 +114,5 @@ export function useCalculator() {
     }
   }
 
-  return { state, send }
+  return { state, send, evaluation, showLoading }
 }

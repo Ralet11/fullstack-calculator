@@ -1,14 +1,99 @@
 .page {
-  display: grid;
-  justify-items: center;
-  align-content: center;
+  --calculator-width: 29rem;
+  --calculator-padding: var(--space-3);
+  --calculator-gap: var(--space-3);
+  --calculator-key-gap: var(--key-gap);
+  --calculator-key-height: var(--control-min);
+  --display-value-max: 2.25rem;
+  --display-short-value-max: 3.25rem;
+  width: min(100%, var(--calculator-width));
   min-height: 100svh;
-  padding: clamp(0.75rem, 4vw, 2rem);
+  margin-inline: auto;
+  padding: var(--space-5) var(--space-3) var(--space-6);
 }
 
+.page[data-size="Compact"] {
+  --calculator-width: 25rem;
+  --calculator-gap: var(--space-2);
+  --calculator-key-gap: 0.375rem;
+  --display-value-max: 1.875rem;
+  --display-short-value-max: 2.75rem;
+}
+
+
 .page h1 {
-  margin: 0 0 1.25rem;
-  font-size: clamp(2rem, 7vw, 3rem);
-  font-weight: 700;
-  letter-spacing: -0.055em;
+  margin: 0 0 var(--space-3);
+  font-size: 1.625rem;
+  font-weight: var(--weight-bold);
+  letter-spacing: -0.045em;
+  line-height: 1.16;
+}
+
+@media (min-width: 36rem) {
+  .page {
+    --calculator-padding: var(--space-4);
+    padding: var(--space-8) var(--space-4);
+  }
+
+  .page h1 {
+    margin-bottom: var(--space-4);
+    font-size: 2rem;
+  }
+}
+
+@media (min-width: 36rem) and (min-height: 44rem) {
+  .page {
+    --calculator-key-height: 3.25rem;
+  }
+
+  .page[data-size="Compact"] {
+    --calculator-key-height: var(--control-min);
+  }
+}
+
+@media (max-height: 44rem) {
+  .page {
+    padding-block-start: var(--space-3);
+  }
+}
+
+.page[data-size="Large"] {
+  --calculator-width: 90%;
+  --calculator-padding: clamp(0.625rem, 1.7vw, 1.625rem);
+  --calculator-gap: clamp(0.5rem, 1.6vmin, 1.25rem);
+  --calculator-key-gap: clamp(0.375rem, 1vmin, 0.875rem);
+  --calculator-key-height: clamp(var(--control-min), 7svh, 5rem);
+  --calculator-key-font: clamp(1.375rem, 4.5vmin, 3.25rem);
+  --calculator-operator-font: clamp(1.625rem, 5vmin, 3.75rem);
+  padding: clamp(0.5rem, 2svh, 1.25rem) 0;
+}
+
+.page[data-size="Large"] h1 {
+  margin-block-end: clamp(0.375rem, 1.5svh, 1rem);
+  font-size: clamp(1.5rem, 4vmin, 2.5rem);
+}
+
+@media (max-width: 35.99rem) {
+  .page[data-size="Large"] {
+    --calculator-width: calc(100% - 1rem);
+  }
+}
+
+@media (min-width: 60rem), (min-width: 42rem) and (max-height: 36rem) {
+  .page[data-size="Large"] {
+    --calculator-key-height: clamp(var(--control-min), 10svh, 6rem);
+  }
+}
+
+@media (min-width: 42rem) and (max-height: 36rem) {
+  .page[data-size="Large"] {
+    --calculator-key-gap: 0.3125rem;
+    --calculator-key-height: clamp(var(--control-min), 8svh, 3.5rem);
+    padding-block: var(--space-1);
+  }
+
+  .page[data-size="Large"] h1 {
+    margin-block-end: var(--space-1);
+    font-size: clamp(1.125rem, 3.5vmin, 1.5rem);
+  }
 }

@@ -690,3 +690,725 @@ Tool — Codex (ChatGPT). Purpose — address the approved keypad, API contract,
 - `npm.cmd run coverage` passed all 35 React tests with 96.50% statement, 94.08% branch, and 98.46% line coverage. The initial TypeScript run caught unsupported Testing Library locator options. After removing them, `npm.cmd run build` passed TypeScript and Vite, and `node --check scripts/browser-smoke.mjs` passed.
 - With Vite started using `npm.cmd run dev -- --host 127.0.0.1 --strictPort`, `npm.cmd run test:smoke` passed all three Chromium scenarios against the running Go API. A separate Chromium probe checked every visual keypad position against the actual Tab order in both modes at 320 and 1024 CSS pixels. A live request with duplicate percentage fields returned 400 and `INVALID_REQUEST`.
 - `git -c core.whitespace=cr-at-eol -c core.safecrlf=false diff --check` passed. No commits or pushes were made, and no hosted CI run was triggered.
+
+## 2026-11-25 — Calculator UX and UI design review
+
+Tool — Codex (ChatGPT). Purpose — assess the display, advanced controls, local history, responsive behavior, accessibility, and the tests needed before implementation.
+
+### Prompt
+
+> Review the calculator UX/UI and evaluate the following improvements before implementation
+>
+> Display
+>
+> Long numbers and scientific notation are currently getting clipped. The display should handle large values without breaking the layout
+>
+> I want the full result to remain accessible, with a readable formatted value and an option to inspect or copy the exact result
+>
+> Review responsive font sizing, overflow handling and how scientific notation is displayed
+>
+> Keep numeric formatting separate from calculation logic, dont modify the internal precision
+>
+> Controls
+>
+> Improve the visual hierarchy between numeric keys, basic operators and advanced operations
+>
+> Keep the keypad consistent across both modes and make sure changing modes doesnt cause unnecessary layout shifts
+>
+> Advanced operations should have clear labels and descriptions, specially power, square root, direct percentage and contextual percentage
+>
+> Add contextual help using tooltips on desktop, but also consider keyboard focus and touch devices
+>
+> Use accessible names and descriptions, dont rely only on hover or mathematical symbols
+>
+> Calculation history
+>
+> I want a small recent calculations history showing the operation, operands and result
+>
+> Review whether to store only completed calculations, how to represent chained operations and how errors should be handled
+>
+> Consider keeping the last 10 calculations locally, without adding a backend endpoint or external state library
+>
+> Evaluate whether users should be able to reuse a previous result and clear the history separately from the calculator
+>
+> Keep history separate from the active calculator state so it doesnt complicate the reducer
+>
+> Responsive and accessibility
+>
+> Review the layout at 320px, 375px, tablet and desktop widths
+>
+> Avoid horizontal overflow, clipped controls and unnecessarily tall layouts in Advanced mode
+>
+> Check keyboard navigation, visible focus, semantic buttons and screen reader announcements for results and errors
+>
+> Testing
+>
+> Identify the relevant component and browser tests for these improvements
+>
+> Focus on observable behavior instead of implementation details
+>
+> Keep the current React and Go architecture unchanged unless theres a clear technical reason
+>
+> Review SPEC.md and the existing components, identify conflicts or missing decisions and recommend the simplest maintainable approach
+>
+> Dont implement anything yet, I want to review the design decisions first
+
+### Findings and recommendations
+
+- The display font scales with the viewport while the card width is capped. One-line text starts at the leading end of its scroll range and can obscure trailing digits or the exponent. Size the font against the display width. Keep up to 12 significant digits in the primary view and let long input reveal the newest digits without preventing inspection of the beginning. Give completed results an explicit Full result disclosure with selectable round-trip numeric text and a Copy result action with manual selection as fallback. Use the stored number and keep formatting in the presentation layer.
+- Anchor the card from the top and keep the Standard keys in the same grid in both modes. Use a compact, labeled Advanced group below the shared keys, with wrapping labels and enough row height for touch. Keep Equals the strongest action. Use specific labels and one set of descriptions shared by the desktop hover/focus help and a tap-friendly help disclosure. Tooltips should keep focus on the trigger, be dismissible and remain available while hovered. Escape closes open help before acting as calculator Clear. Scope the section's pointer-focus behavior and shortcuts so future help, copy, or history controls can be operated without focus being pulled back to the calculator display.
+- Recommend 10 newest accepted successful API evaluations in memory, in a collapsible Recent calculations section. Record each evaluated step, including successful square roots and contextual markers, using the submitted operands and returned result. Skip failed, canceled, and stale requests and repeated equals with no request. Clear history should affect only the list. Keep it separate from calculator Clear. Reuse can wait. If approved, it should load the full stored value as a fresh result, be unavailable during a pending request, and create no new history row.
+- The spec explicitly puts persistent history out of scope. Approve a scope update even for session-only recent history before implementing it, since the feature adds a new interaction and Clear semantics. Decide separately whether the list should survive reloads via browser storage. Recommend session-only first. Keep the API, arithmetic, precision, and active reducer state independent of history.
+- The labeled output currently exposes status semantics while its text also changes during typing. Prefer one polite announcement on accepted results, a concise loading status, and the existing error alert. Verify speech behavior with a screen reader after implementation. Component tests should check full-result inspection and copy/fallback, help and keyboard behavior, accepted steps and skipped stale/errors, the history cap, and separate clear actions. Browser tests should cover overflow, common-key position across mode changes, visible focus, touch help and a real mixed calculation. Preserve existing arithmetic and smoke tests.
+
+### Checks run
+
+- Reviewed `docs/ASSESSMENT.md`, `docs/SPEC.md`, `AGENTS.md`, the layout and keypad styles, display, global keyboard handler, request flow, and existing tests. Checked that the current tree was clean at the start.
+- Starting fresh copies with `go run .` and `npm.cmd run dev -- --host 127.0.0.1 --strictPort` reported ports already bound. Used the existing loopback services. Ran a transient Playwright probe via `node --input-type=module` against the existing Vite frontend and real Go API.
+- At widths 320, 375, 768 and 1440 CSS pixels, verified no page-level horizontal overflow, visible focus and the sampled row-by-row Tab order. The result `-4.18900257888e+305` needed 15 extra horizontal pixels at 320 and 100 extra at 768 and 1440. It fit at 375. A 50-digit input overflowed the display at all four widths and initially scrolled to its beginning. The Percent of value label exceeded its button box at 320. Switching to Advanced moved the Clear key up by 52 to 62 pixels at a 900-pixel viewport height.
+- Headless Chromium touch emulation verified that touchscreen entry exposed the real division-by-zero message as an alert. A physical device and actual screen-reader speech were not tested. Consulted the W3C hover/focus and disclosure guidance.
+- No implementation, spec edits, commits, or pushes. The review only updated this log.
+
+## 2026-11-25 — Display and Advanced controls implementation
+
+Tool — Codex (ChatGPT). Purpose — implement the approved display, responsive layout, and Advanced control improvements from the [UX review](#2026-11-25--calculator-ux-and-ui-design-review).
+
+### Prompt
+
+> Proceed with the display and controls improvements following the reviewed approach
+> Fix long number clipping by sizing the text based on the display container, not the viewport. Keep recent digits visible when entering long numbers
+> Keep the current 12 significant digits formatting, preserve full numeric precision internally and add Full result and Copy result controls
+> Anchor the calculator from the top so switching between Standard and Advanced doesnt shift the common keypad
+> Improve the visual hierarchy between numbers, operators and Equals. Keep the advanced controls grouped below the main keypad
+> Add clear descriptions and examples for advanced operations, with tooltips for mouse and keyboard and an Advanced help section for touch devices
+> Make sure Escape closes help before clearing the calculator, keep keyboard focus and screen reader behavior correct
+> Test the layout at 320, 375, 768 and 1440px, including scientific notation, long inputs and mode switching
+> Keep the existing calculation logic and API unchanged, avoid unnecesary refactoring
+> Run frontend tests, builds and browser checks, report the results
+
+### Decisions and outcome
+
+- Sized the result text relative to the display container and positioned long entry scrolling at the newest digits after edits. Continued to format the main result to at most 12 significant digits. Full result exposes the stored numeric value as selectable round-trip text, and Copy result reports success or provides a manual fallback.
+- Top-aligned the card, distinguished operators and Equals from numeric keys, and put four visibly labeled Advanced controls below the shared keypad. A shared set of descriptions powers the mouse and keyboard tooltips and the touch-friendly Advanced help disclosure. Escape dismisses open help before clearing, and information controls keep focus. The visual display updates during entry without a live announcement for each digit. Accepted API results feed a separate status, and errors retain alert semantics.
+- Documented the approved behavior in `docs/SPEC.md`. The Go API, calculation rules, reducer, and numeric precision were unchanged. History was outside this implementation.
+
+### Checks run
+
+- `npm.cmd run coverage` passed all 37 frontend tests after updating the previous symbol-only Power assertion to allow the visible label. Coverage was 96.58% statements, 92.73% branches and 98.90% lines. `npm.cmd run build` passed TypeScript and the Vite production build.
+- `npm.cmd run test:smoke` passed all three checked-in scenarios against the running Go API and Vite.
+- A transient Playwright probe via `node --input-type=module` verified 320, 375, 768 and 1440 CSS pixels. At each width the large negative scientific result fit on one line, exact value inspection matched the real Go response, a 50-digit input kept newer digits in view while allowing scrolling to its start, and the sampled common keypad positions were identical in both modes. No page-level horizontal overflow was observed. The probe also verified clipboard contents, focus on disclosure dismissal, hover persistence, focus-triggered tooltips, Escape priority, touch help examples, and the real error alert.
+- Checked accessibility roles and keyboard behavior in headless Chromium and React Testing Library. Actual screen-reader speech and physical touch hardware were not tested.
+- `git -c core.whitespace=cr-at-eol -c core.safecrlf=false diff --check` passed. No commits or pushes.
+
+## 2026-11-25 — Frontend visual system and layout review
+
+Tool — Codex (ChatGPT). Purpose — review the current React and CSS structure and propose a visual direction before implementation.
+
+### Prompt
+
+> Now that the end to end functionality is complete I want to focus on the frontend UI/UX
+>
+> The current interface is functional but the visual design is still too generic, we need to improve the overall quality before submission
+>
+> Review the existing React components, CSS Modules and layout structure
+>
+> I want to establish a more consistent design system using CSS variables for colors, spacing, typography, border radius, shadows and interaction states
+>
+> Review the current layout constraints, specially the fixed max width of the calculator, viewport based font sizing and vertical centering. These are causing problems with proportions, display overflow and mode switching
+>
+> For desktop I want a more balanced composition that uses the available space better, while keeping the calculator compact and usable on mobile
+>
+> Review the component hierarchy and identify if display, keypad, advanced controls and a possible history panel should have separate layout responsibilities
+>
+> The display needs to handle long numbers and scientific notation without clipping, using container aware sizing and horizontal overflow only when necessary. Keep formatting separate from calculation logic and preserve full numeric precision
+>
+> Improve the keypad hierarchy using consistent sizing, spacing and clear visual differences between numeric keys, operators, utility actions and Equals
+>
+> Define proper hover, active, focus visible and disabled states, with subtle transitions that dont cause layout shifts
+>
+> Advanced controls should have accessible names, contextual descriptions and tooltips that work with mouse and keyboard, with an alternative for touch devices
+>
+> Review the responsive behavior at 320, 375, 768 and 1440px, including layout stability when switching modes
+>
+> Avoid unnecessary dependencies, CSS frameworks or component libraries unless theres a strong technical reason
+>
+> Keep the current reducer, API contracts and calculation behavior unchanged
+>
+> Before implementation propose the layout strategy, component responsibilities, design tokens and the main visual decisions with their tradeoffs
+>
+> I want to review the approach first, dont modify application code yet
+
+### Findings and recommendation
+
+- The working tree already top-aligns the page and sizes the result relative to its container. The card still caps at 25 rem, and the title and key rows use viewport-based sizing. Existing CSS variables cover colors and one radius. Spacing, typography, shadows and interaction dimensions are repeated across modules. The spec still summarizes Escape as Clear, while the current UI lets it dismiss open help first. Current help and full-result treatments should be preserved and the spec reconciled once design work is approved.
+- Recommend a warm neutral page, ink-blue display and cobalt Equals. Start with a top-aligned one-column layout through tablet, with a fluid card capped at roughly 26 to 28 rem. At about 56 rem, use an approximately 68 rem top-aligned page grid, with the title and a short keyboard reference in one column and a roughly 26 to 30 rem calculator in the other. Keep the shared keypad and responsive two-column Advanced group in the same card. The extra desktop space can hold useful controls guidance without making the keypad harder to scan. A history panel would be a future sibling of the calculator in the supporting column or below on small screens. It requires separate approval, and persistent history is out of scope in the current spec.
+- App owns page composition. Calculator owns the order of sections and the connection to the existing hook. CalculatorDisplay owns typography, overflow, exact-result disclosure and copy. CalculatorKeypad owns the main grid and visual key categories. CalculatorAdvanced owns the Advanced grid and its shared help descriptions and tooltips. Keep formatting in the presentation layer. The reducer, API, and calculation precision need no design changes.
+- Define semantic CSS variables for surfaces, text, digit, utility, operator, primary and feedback roles. Starting values include page `#F5F3EF`, display `#14233B`, Equals `#2148C7` and operator tint `#E8EEFF`. Use an approximately 4 px spacing base, shared key dimensions, 8/12/20 px radii, a single card shadow, system UI typography and tabular figures for numeric text. Use visual-only hover and active states, visible outlines, clear disabled states and reduced-motion behavior. Preserve mouse and focus tooltips, accessible descriptions and the touch disclosure.
+- After approval, verify fits, exact-result access, focus, tooltip and touch help behavior and stable mode switching across the viewport matrix. Use a narrower-height mobile check to catch unnecessarily tall controls, and rerun the existing React tests and real API smoke checks.
+
+### Checks run
+
+- Reviewed the assessment, specification, project instructions, existing React layout components, CSS Modules, and theme. The first Chromium connection found the services stopped. Started the backend with `go run .` and Vite with `npm.cmd run dev -- --host 127.0.0.1 --strictPort`.
+- A transient Playwright probe run with `node --input-type=module` checked 320, 375, 768 and 1440 CSS pixel widths at 900 px height against the real Go API. The card measured 294, 345, 400 and 400 px. Advanced mode added 181 px of card height, while the sampled common-key rectangles stayed identical. Advanced labels fit. There was no page-level horizontal overflow. The negative scientific result `-4.18900257888e+305` fit on one line, Full result matched the number from Go, and a 50-digit input scrolled to its latest digits at every width.
+- Calculated example palette contrast ratios and consulted W3C guidance for focus contrast, target size and hover/focus tooltip behavior. These checks evaluated the existing layout and selected proposed color pairings. The proposed design is not implemented, and the automated suites were not rerun for this review.
+- Only this log was updated. No application or specification changes, commits or pushes.
+
+## 2026-11-25 — Responsive calculator visual redesign
+
+Tool — Codex (ChatGPT). Purpose — implement and visually review the approved design system and desktop composition.
+
+### Prompt
+
+> Proceed with the UI redesign based on the proposed approach
+>
+> I agree with the responsive layout, component separation and design tokens, but I want to refine the desktop composition before considering it complete
+>
+> Avoid having a large empty column with just a title and keyboard instructions, the layout should feel balanced and make good use of the available space
+>
+> Use the proposed warm neutral palette, ink blue display and cobalt for Equals as a starting point, adjust contrast and proportions if needed
+>
+> Refine typography, spacing, alignment, border radius and button hierarchy. I want a clean and polished interface, not just different colors and shadows
+>
+> Extract CalculatorAdvanced from the main keypad and keep the standard controls consistent between modes
+>
+> Keep the display responsive with proper number formatting, full result access and no clipping
+>
+> Add accessible tooltips and contextual help for advanced operations, support keyboard and touch interactions
+>
+> Use CSS Grid and Flexbox where appropriate, keep CSS Modules and avoid unnecesary dependencies
+>
+> Check the layout at 320, 375, 768 and 1440px, also test shorter viewport heights
+>
+> Take screenshots at mobile and desktop sizes and review the actual visual result, not only DOM measurements or passing tests
+>
+> Check spacing consistency, visual balance, readability and alignment. Fix any obvious issues before reporting the implementation as complete
+>
+> Keep the calculator logic, reducer and Go API unchanged
+>
+> Dont implement history yet, that will be a separate step
+>
+> Run the frontend tests, TypeScript checks, production build and existing browser smoke tests
+
+### Decisions and outcome
+
+- Used one split calculator card on desktop. The left side is anchored by the display and Full result interaction, with a compact shortcut reference underneath. The right side holds mode selection, the shared keypad, and the separate CalculatorAdvanced group. Tablet and mobile use a top-aligned stack with the short keyboard hint after the controls.
+- Defined semantic CSS tokens for the warm surfaces, dark readout, cobalt Equals, key hierarchy, typography, spacing, radii, shadows and interaction states. Shared controls use fixed geometry across hover, active, focus and disabled states, with reduced-motion support. Kept visible Advanced labels, accessible descriptions, mouse and keyboard tooltips, and the touch help disclosure.
+- Used container sizing for the display, giving short numbers greater emphasis while keeping long numbers legible. Kept full-result inspection and copy on the stored precision. The visual review led to tighter desktop readout and shortcut spacing, disclosure chevrons and a distinct Copy result button.
+- The reducer, calculation logic and API were unchanged. No dependencies or history were added.
+
+### Checks run
+
+- `npm.cmd run coverage` passed all 37 frontend tests. Coverage was 96.60% statements, 92.91% branches and 98.90% lines. `npm.cmd run build` passed TypeScript checking and the Vite production build.
+- `npm.cmd run test:smoke` passed all three checked-in Chromium scenarios against the running Go API and Vite.
+- A transient Playwright probe via `node --input-type=module` passed at 320×900, 375×812, 768×900, 1440×900, 320×568, 375×600 and 1440×650 CSS pixels. Checked stable shared-key positions, a large scientific result on one line, the matching exact result, a 50-digit entry scrolled to its newest digits, and no page-wide horizontal overflow. Also verified mouse and keyboard tooltips, Escape preserving focus and input, reduced motion, and touch help at 320×568.
+- Captured and visually inspected mobile, tablet and desktop screenshots in the ignored `.tooling/ui-redesign` directory, then captured and reviewed the refined composition. Browser checks used headless Chromium and touch emulation.
+- `git -c core.whitespace=cr-at-eol -c core.safecrlf=false diff --check` passed. No commits or pushes.
+
+## 2026-11-25 — Calculator UI specification
+
+Tool — Codex (ChatGPT). Purpose — consolidate the visual decisions, UI acceptance criteria, and proposed history scope.
+
+### Prompt
+
+> Before making more UI changes I want to consolidate the design decisions into a proper specification
+>
+> Review the current frontend, SPEC.md and the UI decisions we discussed
+>
+> Create docs/UI_SPEC.md defining the desktop and mobile layouts, visual hierarchy, design tokens, responsive behavior and component responsibilities
+>
+> The display and keypad should remain together, with a collapsible history panel and compact contextual help
+>
+> Define the history behavior, accessibility requirements and visual acceptance criteria, including layout stability and long number handling
+>
+> Keep the scope realistic for this assessment, distinguish required fixes from optional features
+
+### Outcome and checks
+
+- Created `docs/UI_SPEC.md` as the presentation companion to `docs/SPEC.md`. It records the unified calculator card, responsive layout, semantic tokens, responsibilities, compact help, accessibility, and testable visual requirements.
+- Documented session-only history as a separate optional assessment increment. The proposed disclosure sits below the calculator at all widths and retains up to 10 successful evaluations. Persistent storage and result reuse remain deferred.
+- Reviewed the existing React components, CSS Modules, theme, assessment, functional specification, and prior UI discussion. Checked Markdown links and the Git diff. No application or functional spec files were edited, and no application tests were needed for this documentation change.
+
+## 2026-11-25 — Compact calculator navigation and history design review
+
+Tool — Codex (ChatGPT). Purpose — review the proposed mode menu, vertical card, and responsive history interactions before implementation.
+
+### Prompt
+
+> Replace the Standard and Advanced segmented control with a compact navigation menu opened from a hamburger button
+>
+> The menu should show the available modes and indicate which one is active. Changing modes must preserve the existing calculation state
+>
+> Keep the display and keypad together in a vertical calculator layout, result above the controls with a clear visual hierarchy
+>
+> Add a history button in the calculator header that opens and closes a Recent calculations panel
+>
+> On desktop history can expand beside the calculator, on mobile use an overlay or drawer that doesnt resize or shift the keypad
+>
+> History should be closed by default, show the latest 10 successful evaluations and have its own Clear history action
+>
+> Keep the help for advanced operations accessible but secondary, avoid large shortcut panels occupying permanent space
+>
+> Define the menu and history interactions including Escape handling, focus management, aria-expanded, keyboard navigation and touch behavior
+>
+> Keep the existing design tokens as a starting point but refine the visual language toward a more compact and polished calculator interface
+>
+> Review the component responsibilities and responsive behavior before implementation, dont change the calculation logic or API
+
+### Proposed interactions
+
+- Use one top-aligned vertical card at all widths. Put a Modes button, current mode label, and History button in its header, then the display, shared keypad, and optional Advanced keys and help. Retire the permanent shortcuts card. Retain the existing warm surfaces, navy readout, key categories and cobalt Equals, with compact spacing and at least 44 px touch targets.
+- Use a disclosure for the mode chooser, with native buttons in tab order, an active checkmark and pressed state, and an accessible label and expanded state on the hamburger trigger. Opening leaves focus on the trigger. Selecting a mode or pressing Escape closes and returns focus to the trigger. Clicking outside or tabbing away dismisses without taking focus back. The menu and mode switch leave entry, operations, results, percentage marker, and in-flight requests intact.
+- Dock Recent calculations beside the card where both fit without moving the keypad. Use a labeled modal drawer on narrower screens, including tablets where the dock would crowd the card. Open with an accessible History button that exposes its expanded state. The dock allows Tab to leave. The drawer moves focus inside and keeps background controls inert. Both have a visible Close action. Escape inside the dock or anywhere in the open drawer and Close restore focus to History. A dock without focus may remain open during calculation.
+- Record the last 10 accepted successful API evaluations in memory, most recent first and one per evaluated step, with operation, exact operands and result, and the contextual flag when applicable. Errors, canceled and stale responses, and repeated Equals without evaluation add no rows. Clear history only clears the list. Keep persistent storage and result reuse deferred.
+- Keep Calculator responsible for presentation coordination, header for triggers, display and keypad for their existing rendering, CalculatorAdvanced for compact help, and CalculatorHistory for presentation. History listens at the existing accepted-success boundary and stays separate from the active reducer. Drawer and disclosures handle Escape before calculator Clear. Suppress calculator shortcuts while focus is in history or while the modal drawer is active.
+
+### Checks run
+
+- Reviewed the current React components, keyboard handlers, request acceptance, theme, UI specification, and functional spec. The split card and below-card history placement in UI_SPEC.md differ from this proposal. Consulted W3C disclosure and modal-dialog guidance.
+- Only this log was updated. Application and specification implementation, screenshots, and browser verification remain pending.
+
+## 2026-11-25 — Compact calculator navigation and history
+
+Tool — Codex (ChatGPT). Purpose — implement the approved mode menu, vertical layout, and session-only history.
+
+### Prompt
+
+> I approve the proposed layout and interaction model
+>
+> Update UI_SPEC.md with the agreed changes and proceed with the implementation
+>
+> Keep the calculator as a single vertical unit with a compact header, mode menu, display and keypad
+>
+> Remove the permanent shortcuts panel and keep Advanced help collapsed by default
+>
+> Implement the collapsible history with the latest 10 successful calculations, stored in memory and managed separately from the active calculator reducer
+>
+> Use a docked history panel on wide desktop and a modal drawer on smaller screens, without resizing or shifting the calculator
+>
+> Handle keyboard navigation, focus restoration, Escape and outside clicks correctly. Make sure these interactions dont interfere with calculator shortcuts
+>
+> Keep the current design tokens but refine the spacing, typography and proportions for a more polished interface
+>
+> Dont modify calculation logic or backend contracts
+>
+> Add focused tests for menu behavior, history recording, clearing and stale responses
+
+### Decisions and outcome
+
+- Updated `docs/UI_SPEC.md` and returned to one compact vertical card. Added the mode-picker and History in its header, removed the permanent shortcuts panel, and retained the collapsed Advanced help and the existing display and keypad.
+- History starts closed and holds the latest 10 successful current responses in memory, one entry per evaluated operation. It uses the exact request values and returned number, including the contextual percentage marker, and formats for readability. Calculator Clear leaves history intact. Clear history leaves the active calculation intact. Mode changes keep pending operations and in-flight requests.
+- Used a non-modal dock from `72rem` and a native modal drawer below. Menu activation, outside presses, escape handling and focus return are independent of calculator Clear. The drawer suspends calculator shortcuts and wraps Tab in both directions. Initial Chromium probing found a Tab boundary gap in the native dialog; added explicit wrapping and a checked-in smoke regression.
+- The reducer, arithmetic and Go contract were unchanged. The request hook gained only a callback on accepted success for history recording.
+
+### Checks run
+
+- `npm.cmd run coverage` passed all 41 frontend tests. Coverage was 91.31% statements, 87.89% branches and 94.44% lines. `npm.cmd run build` passed TypeScript and the Vite build. `node --check scripts/browser-smoke.mjs` passed.
+- `npm.cmd run test:smoke` passed all four scenarios against the real Go API, including the new mobile history and focus case.
+- Transient Playwright probes via `node --input-type=module` passed at 320×568, 375×812, 768×900, 1151×650, 1152×650 and 1440×900. Checked card and keypad stability, menu focus, dock versus drawer behavior, Escape, Tab in both directions, backdrop dismissal, independent clearing, and correct behavior when resizing across the dock breakpoint. The 320 px view also retained scientific notation and full precision, and history reset on reload.
+- Visually reviewed the desktop menu, desktop dock, short mobile card, and mobile drawer screenshots under ignored `.tooling/compact-calculator`. Browser work used headless Chromium and touch emulation. No screen-reader speech or physical device was checked.
+- `git -c core.whitespace=cr-at-eol -c core.safecrlf=false diff --check` passed. No commits or pushes.
+
+## 2026-11-25 — Live calculator expression display
+
+Tool — Codex (ChatGPT). Purpose — make the upper readout show the active or completed evaluation.
+
+### Prompt
+
+> Improve the calculator display so the upper area shows the actual mathematical expression instead of the static Result label
+>
+> Show the operands, operator and percentage modifier while entering a calculation, and keep the completed expression with = after evaluation
+>
+> The large display value should remain the current input or calculated result
+>
+> Support binary operations, square root, power, direct and contextual percentages, including chained calculations
+>
+> Use the actual calculator state to derive the expression, dont introduce a separate expression parser or duplicate calculation state
+>
+> Make sure the expression reflects left to right evaluation and doesnt become misleading after an operator replacement, Clear or a failed request
+>
+> Handle long expressions with truncation or horizontal scrolling without showing a native scrollbar, keep the latest relevant part visible and allow access to earlier content
+>
+> Keep formatting in the presentation layer, dont change the reducer or API unless theres a clear state requirement that cannot be derived safely
+>
+> Add focused tests for pending expressions, completed calculations, chaining, unary operations and error recovery
+
+### Decisions and outcome
+
+- Derived the live expression from the pending operator, existing entry and result, and the request already accepted or attempted by the hook. Extended the existing accepted-result metadata with its request. The reducer, API, arithmetic and stored precision were unchanged.
+- Completed expressions append equals only after success. Chains show the active step with the previously accepted result as the new left operand. A square root on a pending right operand updates that operand and keeps the binary expression active. Failures retain the attempted expression without equals and Clear removes it. Direct percentage uses a base-first expression such as `150 × 20%`; contextual percentage marks the rate on its current operation. The large value remains independent of the expression.
+- Long expressions scroll to the latest digits with a hidden native scrollbar and support keyboard and touch scrolling to earlier content. Updated the display section of `docs/UI_SPEC.md`.
+
+### Checks run
+
+- Added five expression tests and updated earlier operator-prefix assertions to expect complete expressions. Extended the stale-response case to protect the newest completed expression. `npm.cmd run coverage` passed all 46 frontend tests with 91.84% statement, 88.66% branch, and 94.79% line coverage. `npm.cmd run build` passed TypeScript and the Vite production build.
+- `npm.cmd run test:smoke` passed all four checked-in real-API scenarios.
+- Transient Playwright probes via `node --input-type=module` passed at 320, 375, 768 and 1440 CSS pixels. Checked real left-to-right chaining and division recovery, 50-digit overflow with no visible scrollbar or page-level scroll, access to earlier digits using the keyboard, and Clear. A browser-emulated touch swipe also revealed earlier content at 320 px. Reviewed mobile and desktop screenshots under ignored `.tooling/expression-display`.
+- `git -c core.whitespace=cr-at-eol -c core.safecrlf=false diff --check` passed. No commits or pushes.
+
+## 2026-11-25 — Display scrollbars and keyboard focus
+
+Tool — Codex (ChatGPT). Purpose — remove the unwanted scrollbar and inner focus outline while retaining long-value navigation and a visible keyboard focus indicator.
+
+### Prompt
+
+> Fix the remaining display issues
+>
+> The native scrollbar is still visible even with a single digit, and theres an unwanted inner border around the result
+>
+> Check the DOM, overflow and focus styles to find the cause
+>
+> Hide the scrollbar without breaking horizontal scrolling for long values, keep the result right aligned with proper padding
+>
+> Preserve keyboard accessibility and visible focus when needed
+>
+> Verify the result in Chromium at different screen sizes, both focused and unfocused
+
+### Outcome and checks
+
+- Chromium measured one pixel of vertical overflow on the single-digit output at 375 px. Horizontal auto also computed vertical overflow as auto, and the value entry used a thin native scrollbar. The output border was zero. Its keyboard focus outline produced the inner rectangle.
+- Updated only the display CSS. Both scrollable lines retain horizontal auto scrolling, hide native scrollbars, and suppress vertical scrolling. The value's keyboard focus indicator now sits around the outside edge of the display. Pointer focus and the unfocused display have no ring. Alignment, padding, markup and calculation behavior were retained.
+- A transient Playwright probe via `node --input-type=module` used Chromium with overlay scrollbars disabled. At 320, 375, 768 and 1440 CSS pixels it checked focus, scrollbar styling and geometry, right alignment, long-value scroll to the end, and ArrowLeft access to earlier digits. A touch-emulated swipe also worked at 320 px. Reviewed the mobile keyboard-focus and unfocused desktop screenshots under ignored `.tooling/display-focus`.
+- `npm.cmd test` passed all 46 frontend tests. `npm.cmd run build` passed TypeScript and the Vite production build. `npm.cmd run test:smoke` passed all four real-API scenarios. `git -c core.whitespace=cr-at-eol -c core.safecrlf=false diff --check` passed.
+
+## 2026-11-25 — Compact display, unified symbol keypad and history actions
+
+Tool — Codex (ChatGPT). Purpose — reconcile the rendered calculator with the latest UI requirements and verify the result on desktop and mobile.
+
+### Prompt
+
+> Review the current UI against our latest design decisions, some previously requested changes are still missing
+>
+> Remove the Full result disclosure completely, the display should only show the active expression and the main result
+>
+> Refine CalculatorHistory, replace Close and Clear history text buttons with accessible icon buttons and place them properly in the header. Improve spacing and alignment of history entries
+>
+> Integrate Advanced operations into the main keypad layout instead of rendering them as a separate section below it
+>
+> Use compact mathematical symbols for Advanced operations rather than long text labels, keep accessible names and tooltips to explain their behavior
+>
+> Make sure both percentage controls remain clearly distinguishable
+>
+> Review UI_SPEC.md and update any outdated decisions that conflict with these requirements
+>
+> Keep the existing calculator behavior, history state and Go API unchanged
+>
+> Test Standard and Advanced layouts at mobile and desktop sizes, check the actual screenshots against each requirement
+>
+> Run the relevant frontend tests, build and browser smoke tests
+>
+> Report which requirements were completed and identify anything still pending
+
+### Outcome and checks
+
+- Removed Full result and Copy result from the display and its CSS. The expression and value keep the regular layout, with the existing loading and error feedback. Calculation precision and history state remain intact.
+- Added a fourth-column grid row of symbol keys within the main keypad in Advanced mode. `xʸ`, `√`, `×%` and `%` retain accessible names and descriptions. `×%` calculates a percentage of a base, and `%` toggles a contextual rate. Advanced help remains collapsed. Initial checks found a keyboard tooltip could obscure pointer access and that moving help into the grid redirected focus to the display. Moved the tooltip below the keys, made focus-only tooltips pointer-transparent, and exempted help from the pointer focus redirect.
+- Put accessible trash and close icon buttons in the history header. Aligned expressions left and results right. Preserved independent clearing, focus recovery, the dock and drawer, the reducer and Go API. Updated `docs/UI_SPEC.md` to match.
+- `npm.cmd run coverage` passed all 47 frontend tests, with 91.71% statements, 88.82% branches, and 94.46% lines. `npm.cmd run build` passed TypeScript and Vite production build. `npm.cmd run test:smoke` passed five live Go scenarios, including the new regression for tooltip pointer access and help focus.
+- Used a transient Playwright probe through `node --input-type=module` and reviewed screenshots in ignored `.tooling/symbol-keypad`. Verified Standard and Advanced at 320×568, 375×812, 768×900 and 1440×900, mobile history and desktop dock alignment, touch help, mouse and keyboard tooltips, clear and close actions, and stable common keys. Checks used headless Chromium with touch emulation.
+- `git -c core.whitespace=cr-at-eol -c core.safecrlf=false diff --check` passed. No commits or pushes.
+
+## 2026-11-25 — Unified Advanced tooltips and result motion
+
+Tool — Codex (ChatGPT). Purpose — consolidate contextual help and add motion for accepted calculator results.
+
+### Prompt
+
+> Remove the Advanced help section, its redundant with the tooltips
+>
+> Keep one contextual help system that works with mouse, keyboard and touch devices, with accessible descriptions
+>
+> Add a subtle animation when a calculation result is returned, around 200ms using opacity and a small translateY transition
+>
+> Only animate successful API results, not digit inputs, errors or mode changes
+>
+> Avoid layout shifts, preserve numeric precision and respect prefers-reduced-motion
+>
+> Keep the existing architecture and calculation logic unchanged
+>
+> Verify the interactions in Chromium and run the relevant tests
+
+### Outcome and checks
+
+- Removed the separate Advanced help disclosure. Each existing tooltip supplies the accessible description and opens on mouse hover, keyboard focus, or a roughly 450 ms touch or pen hold. A hold suppresses the operation, a tap still activates it, and Escape or a tap outside dismisses touch help. On coarse-pointer layouts the footer explains the hold gesture.
+- Animated the existing output element for 200 ms using opacity and a 4 px translateY when a new accepted API result is shown. Used the accepted request identity to avoid replays during input, mode switching, or display updates. Reduced-motion preferences skip the animation. Updated UI_SPEC.md. Reducer, Go API, arithmetic, and stored values retained their behavior.
+- `npm.cmd run coverage` passed all 47 frontend tests with 88.53% statement, 86.03% branch and 90.69% line coverage. `npm.cmd run build` passed TypeScript and Vite production build. `npm.cmd run test:smoke` passed all five real-API scenarios.
+- A transient Chromium probe via `node --input-type=module` verified hover persistence, keyboard focus and Escape, 200 ms opacity and position animation, stable keypad geometry, and distinct successful responses with the same value. Digit entry, failure, repeated Equals without a request, and mode changes did not start an animation. Touch emulation at 320×568 and 375×812 verified that a hold opened the tooltip without an API request, outside tap dismissed it, and a short tap performed square root. The probe also checked long-value scrolling and successful reduced-motion results without animation.
+- `git -c core.whitespace=cr-at-eol -c core.safecrlf=false diff --check` passed. No commits or pushes.
+
+## 2026-11-25 — Delayed loading feedback and smoother results
+
+Tool — Codex (ChatGPT). Purpose — remove visible loading flashes and keep result motion independent from calculation state.
+
+### Prompt
+
+> The result transition still feels abrupt because Calculating appears briefly before the final value
+>
+> Keep the previous value visible while the API request is pending, dont replace it with loading text
+>
+> Only show a subtle loading indicator if the request takes longer than 250ms, without changing the display layout or dimensions
+>
+> When the result arrives use a smooth transition, avoid flashing, jumping or unnecessary re-renders
+>
+> Keep the final value immediately available in state, dont delay calculations just for the animation
+>
+> Preserve error handling, stale response protection and reduced motion support
+>
+> Review the current loading and animation implementation, fix the cause instead of adding more effects
+
+### Outcome and checks
+
+- Found that the immediate loading text occupied space in the expression header for every request and could flash before fast responses. Kept the readout value visible and gave the slow-request dots a fixed spot in the header. The polite loading message is visually hidden and appears only after the request has been pending for 250 ms.
+- Scheduled the threshold within the existing request lifecycle without adding an effect. Settling or aborting the request cancels its timer. The existing active-request guard also protects loading feedback. Successful results are available immediately, including while the 200 ms animation runs. Reduced the motion to a 2 px rise from 90% opacity and kept reduced-motion support. Updated UI_SPEC.md.
+- Added two fake-timer cases for the 249/250 ms boundary, immediate success and canceled or fast request cleanup. `npm.cmd run coverage` passed all 49 frontend tests with 91.02% line coverage. `npm.cmd run build` passed TypeScript and the Vite production build. `npm.cmd run test:smoke` passed all five real-API scenarios.
+- A transient Chromium probe via `node --input-type=module` delayed real API requests at 320 and 1440 CSS pixels. Verified the readout and layout remained steady, fast requests stayed quiet, a slow request displayed the dots, and success or error removed them. Also verified immediate result availability with the animation running and no animation with reduced motion.
+- `git -c core.whitespace=cr-at-eol -c core.safecrlf=false diff --check` passed. No commits or pushes.
+
+## 2026-11-25 — Calculator clipboard shortcuts
+
+Tool — Codex (ChatGPT). Purpose — support native platform copy and paste of numeric calculator values.
+
+### Prompt
+
+> Add clipboard support to the calculator
+>
+> Support Ctrl+C and Ctrl+V on Windows, and Cmd+C and Cmd+V on macOS
+>
+> Copy the full numeric value instead of the rounded display text
+>
+> Allow pasting valid numbers including negatives, decimals and scientific notation
+>
+> Reject invalid or non finite values without changing the current calculation
+>
+> Pasting should replace the current entry while preserving pending operations, and start a new calculation after a completed result
+>
+> Handle clipboard permissions, keyboard focus and pending requests correctly
+>
+> Keep the existing architecture and calculation logic unchanged unless necessary
+>
+> Add focused tests and verify the behavior in Chromium
+
+### Outcome and checks
+
+- Used native clipboard events for the platform shortcuts. Copy uses the stored, unrounded numeric result or the complete editable operand and leaves browser text selection alone. Clipboard interactions are scoped to the calculator and ordinary page focus. Menus, history, and editable controls keep their native interactions. Unavailable clipboard event data is safely ignored.
+- Validated signed decimal and scientific-notation text and rejected invalid and non-finite values before dispatch. Added one paste entry transition to preserve the pending operation and contextual marker or start fresh after a result. A pasted number in scientific notation becomes ordinary decimal text when editing its digits. Active requests ignore paste and remain eligible to complete. Updated UI_SPEC.md. Arithmetic and Go contracts retained their existing behavior.
+- `npm.cmd run coverage` passed all 55 frontend tests, including six focused clipboard tests, with 91.78% line coverage. `npm.cmd run build` passed TypeScript and Vite production build. `npm.cmd run test:smoke` passed all five live-API scenarios.
+- A transient browser check via `node --input-type=module` used the actual Windows Ctrl+C and Ctrl+V shortcuts in headless Chromium. It verified the full copy of `0.1 + 0.2`, scientific paste and its outgoing API request, fractional replacement, invalid and overflowing input, native selection copying, history focus, and paste safety during a delayed real request. Cmd uses the same native clipboard events. A macOS runtime was not available for direct testing.
+- `git -c core.whitespace=cr-at-eol -c core.safecrlf=false diff --check` passed. No commits or pushes.
+
+## 2026-11-25 — Percentage interaction review
+
+Tool — Codex (ChatGPT). Purpose — compare the two current percentage controls with a single contextual key and identify simplifications.
+
+### Prompt
+
+> I want to review how we're handling percentages in the calculator
+>
+> Looking at the Windows calculator, it uses a single % button and its behavior depends on the pending operation
+>
+> Our implementation has two different percentage controls, and Im not sure the distinction is intuitive for someone using it for the first time
+>
+> Review the current behavior, SPEC.md and the UI, compare both approaches from a usability perspective
+>
+>
+> What alternatives would you suggest to simplify the interaction without losing the functionality we already implemented?
+>
+> Explain the tradeoffs and any impact on our current state management or API
+
+### Outcome and checks
+
+- Reviewed SPEC.md, UI_SPEC.md, the Advanced keys, pending state, expression formatting, request routing, and Go percentage arithmetic. Direct `×%` starts a binary operation before entry of the rate. Contextual `%` marks the entered right operand without a request. The two gestures yield the same numerical result for direct percentage and contextual multiplication.
+- Reviewed current Microsoft Calculator source. Its percentage key transforms the visible operand immediately. Its multiply and divide use the rate as a fraction, while add and subtract use a percentage of the base. The older Microsoft blog describes different multiply and divide behavior. The review relies on the current source and did not exercise the installed Windows app. [Arithmetic source](https://github.com/microsoft/calculator/blob/main/src/CalcManager/CEngine/scifunc.cpp#L89-L101) · [Display handling](https://github.com/microsoft/calculator/blob/main/src/CalcManager/CEngine/scicomm.cpp#L323-L367)
+- Recommended a single postfix `%` in the current Advanced scope. `150 × 20 % =` preserves the direct calculation result through contextual multiply while the direct API operation stays available. This reuses the existing boolean marker and keeps all arithmetic in one Go request. To retain the explicit base-first UI sequence, use the same key to start direct percentage when no operator is pending, at the cost of more context to explain. Keeping visibly named separate controls is also viable. Decisions about standalone behavior and exposing the key in Standard mode remain open.
+- A transient Chromium check via `node --input-type=module` at 375 CSS pixels verified both real requests returned 30 and that contextual marking toggles without a request. Only this log was updated. No application or specification edits were made.
+
+## 2026-11-25 — Single contextual percentage key
+
+Tool — Codex (ChatGPT). Purpose — simplify the Advanced keypad while preserving both percentage API forms.
+
+### Prompt
+
+> I agree with the first approach, lets simplify the UI to a single contextual % button
+>
+> Remove the direct percentage control from the keypad, users can calculate a percentage of a value using multiplication
+>
+> Keep the existing percentage API operation available, dont remove backend functionality
+>
+> Preserve the editable percentage marker and the current left to right evaluation
+>
+> Make sure the % button behaves correctly with pending operations, mode switching and error recovery
+>
+> Update SPEC.md and UI_SPEC.md to reflect the simplified interaction
+>
+> Adjust the relevant frontend tests and browser smoke tests, keep backend behavior unchanged
+
+### Outcome and checks
+
+- Removed `×%` from the Advanced keypad and let `%` span two columns. Updated its tooltip with `150 × 20% = 30` and documented the interaction in SPEC.md, UI_SPEC.md, and README.md. The reducer, API client, and Go implementation retained their existing behavior.
+- `npm.cmd run coverage` passed all 55 frontend tests with 91.78% line coverage and 85.54% branch coverage. `npm.cmd run build` passed TypeScript and the Vite production build. Early runs exposed an assertion referencing an out-of-scope helper and an outdated history expectation after adding the new smoke calculation. Both were corrected.
+- `npm.cmd run test:smoke` passed all six live React and Go scenarios, including `150 × 20% = 30` and mode switching and recovery from `150 ÷ 0%`. A separate HTTP POST with `{"operation":"percentage","a":150,"b":20}` returned `{"result":30}`. The native backend test suite was not rerun for this UI change.
+- A transient Chromium layout check confirmed the three Advanced keys fit one row, Equals stays in place when switching modes, and the page has no horizontal overflow at 320, 375, 768, and 1440 CSS px. Inspected screenshots at 320×568 and 1440×650. `git -c core.whitespace=cr-at-eol -c core.safecrlf=false diff --check` passed. No commits or pushes.
+
+## 2026-11-25 — Assessment verification report
+
+Tool — Codex (ChatGPT). Purpose — review calculator coverage, check CI, and prepare reproducible assessment evidence.
+
+### Prompt
+
+> Review the current test coverage and prepare the assessment verification report
+>
+> Check the frontend and backend test suites, coverage configuration and existing GitHub Actions workflow
+>
+> Identify uncovered behavior that could affect correctness, dont add tests just to increase coverage
+
+### Outcome and checks
+
+- Created `docs/VERIFICATION.md` with fresh results, CI scope, relevant behavior gaps, and reproduction commands. No application, test, or workflow files changed.
+- `npm.cmd run coverage` passed all 55 frontend tests with 91.78% line and 85.54% branch coverage. `npm.cmd run build` and all six `npm.cmd run test:smoke` scenarios passed. One-off Chromium checks covered long-entry scrolling, emulated touch help, reduced motion, and live square root followed by power.
+- Native Windows Go 1.27.4 passed `go test -count=1 -coverpkg=./...` with a temporary coverage profile, `go tool cover -func`, `go vet ./...`, and the API build. Coverage was 92.8% overall. With Go 1.25.0, Windows Application Control blocked the HTTP test executable. The arithmetic tests, vet, and build passed under that version. The historical GitHub-hosted Go 1.25.0 Linux baseline passed at 93.0% coverage. No new hosted run was triggered.
+
+## 2026-11-25 — Final testing setup
+
+Tool — Codex (ChatGPT). Purpose — cover failed intermediate calculations and verify both layers in CI.
+
+### Prompt
+
+> Finalize the testing setup before submission
+>
+> Add a React regression test for a failed intermediate calculation like 8 / 0 followed by another operator, verify recovery and that history stays unchanged
+>
+> Add a frontend job to GitHub Actions running npm ci, coverage and production build. Keep the backend job unchanged
+>
+> Update VERIFICATION.md and README.md with the testing process and coverage results
+>
+> Run the relevant checks and report the actual results, avoid unnecesary changes
+
+### Outcome and checks
+
+- Added one React regression for `8 ÷ 0 ×`. It checks that the existing history entry survives the failure, then verifies the corrected chain `8 ÷ 2 × 3 = 12` and its two new history entries.
+- Added a Node 24 frontend job on Ubuntu. Compared the backend job, workflow triggers, and permissions against HEAD and confirmed they match. `go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.7 .github/workflows/backend.yml` passed. The frontend job has yet to run on GitHub.
+- In a clean temporary frontend directory, `npm.cmd ci`, `npm.cmd run coverage`, and `npm.cmd run build` passed. All 56 tests passed with 91.78% line and 85.54% branch coverage. Native Windows Go 1.27.4 passed the full test suite with 92.8% statement coverage, vet, and build.
+- The first `npm.cmd run test:smoke` attempt found the local servers stopped. All six Chromium scenarios passed after starting Go and Vite. Updated README.md and docs/VERIFICATION.md. No application code changed.
+
+## 2026-11-25 — Advanced keypad first row
+
+Tool — Codex (ChatGPT). Purpose — integrate the Advanced controls at the top of the shared keypad.
+
+### Prompt
+
+> Move the Advanced operations x^y, sqrt and % to the top of the main keypad
+>
+> Integrate them into the same four column grid, not a separate section below
+>
+> Keep consistent button sizes, spacing and visual hierarchy
+>
+> Preserve the Standard layout, keyboard navigation, tooltips and calculator state
+>
+> Update UI_SPEC.md and verify the layout in Chromium at mobile and desktop sizes
+>
+> Run the relevant tests and update AI_USAGE.md
+>
+> Dont commit or push
+
+### Outcome and checks
+
+- Moved the Advanced controls above the utility keys in both DOM and visual order. The row uses the existing four-column grid and key styles, with `%` spanning two columns. Tooltips open upward to keep shared keys clear. Standard geometry and calculator state are unchanged. Updated UI_SPEC.md to specify the one-row shift in Advanced mode.
+- Updated the React and browser assertions for Tab order and tooltip behavior. `npm.cmd run coverage` passed all 56 tests with 91.78% line and 85.54% branch coverage. `npm.cmd run build` and all six live `npm.cmd run test:smoke` scenarios passed.
+- Checked grid alignment, absence of horizontal overflow, tooltip bounds, and state preservation across modes in Chromium at 320×568, 375×650, 768×800, 1440×650, and 1440×900. Inspected screenshots at 320×568 and 1440×900. At 375px, emulated touch confirmed a long press shows help without selecting Power and a digit tap dismisses it. No commits or pushes.
+
+## 2026-11-25 — Calculator size options review
+
+Tool — Codex (ChatGPT). Purpose — assess Compact, Default, and Large as presentation preferences.
+
+### Prompt
+
+> Review adding three calculator size options: Compact, Default and Large
+>
+> Use CSS variables or container classes to control card width, key dimensions, spacing and display typography
+>
+> The selected size should only affect presentation, not calculator state or API behavior
+>
+> Keep the control discreet, preferably in the navigation menu instead of adding buttons to the keypad
+>
+> Make sure all sizes remain responsive and automatically fit smaller viewports without horizontal overflow
+>
+> Consider how the history panel should behave when Large is selected, keeping the calculator stable
+>
+> Review the existing layout and suggest the simplest implementation without new dependencies
+
+### Outcome and checks
+
+- Recommended a presentation-only App state value and calculator-scoped CSS variables. Default retains the current styling. Proposed page caps are 25, 29, and 33 rem including gutters. At narrow or short sizes, Large uses baseline spacing and key heights. Compact retains 44 px touch targets.
+- Recommended a second labeled group in the hamburger popover with a selected state, existing dismissal behavior, and focus restoration. The preference starts at Default on reload. No calculator state, request, or history entry depends on the selected size.
+- In a temporary Chromium session, compared the current history geometry at 320, 1151, 1152, 1216, and 1440 px and simulated a 33 rem page cap with an inline width override. At the existing 1152 px dock breakpoint the simulated dock reached the viewport edge. At 1216 px it left 32 px on the right. Recommended one 76 rem dock threshold for all three sizes so changing presets never changes history from docked to modal. The 72–76 rem range would use the existing drawer.
+- No application or specification files were changed. No test suite was run, and no commits or pushes were made.
+
+## 2026-11-25 — Calculator size presets
+
+Tool — Codex (ChatGPT). Purpose — add responsive presentation presets and verify calculator and history continuity.
+
+### Prompt
+
+> Proceed with the three calculator size presets following the reviewed approach
+>
+> Add Compact, Default and Large to the existing hamburger menu, with a checkmark for the selected size
+>
+> Use scoped CSS variables for width, spacing, key height and display typography. Keep Default as the initial size
+>
+> Update the history dock breakpoint to 76rem for all sizes
+>
+> Make sure size changes dont affect calculations, pending requests, history or keyboard navigation
+>
+> Keep all presets responsive, with no horizontal overflow or undersized touch targets
+
+### Outcome and checks
+
+- Added Compact, Default, and Large to the hamburger menu. App owns the presentation preference and starts at Default after reload. The selected option gets a checkmark and reports its pressed state. Choosing a size restores focus to the trigger. Scoped CSS variables control width, spacing, row height, and display type, and preserve the default geometry.
+- Set the history dock threshold to 76 rem for every size and updated UI_SPEC.md. A focused React regression verifies that changing size preserves a pending operation, in-flight request, and open history. Display scroll positioning updates on a size change to keep the active end of a long entry in view.
+- `npm.cmd run coverage` passed all 57 frontend tests with 91.89% line and 85.61% branch coverage. `npm.cmd run build` and all six live `npm.cmd run test:smoke` scenarios passed.
+- A transient Chromium layout check verified all three sizes at 320, 375, 768, 1152, 1215, 1216, and 1440 CSS px, including 320×568 and 1440×650. Checked 44px minimum key targets, no horizontal overflow, history placement, result retention, and the last digits of a 50-digit entry after resizing. Inspected mobile and desktop screenshots. No backend changes, commits, or pushes.
+
+## 2026-11-25 — Immersive Large calculator
+
+Tool — Codex (ChatGPT). Purpose — make Large a distinct distance-readable layout while preserving the calculator’s interaction model.
+
+### Prompt
+
+> The three size presets still look too similar, I want Large to be a noticeably different experience
+>
+> Treat Large as an immersive calculator mode for someone using the app from a distance, almost fullscreen
+>
+> Use around 85-90% of the available viewport with significantly larger keys, typography and result display
+>
+> Reconsider the layout for Large instead of just increasing the card width, use the extra space to create a balanced composition
+>
+> Keep Compact small for multitasking and Default as the current standard calculator
+>
+> Make sure Advanced controls, history and the mode menu still work naturally in the larger layout
+>
+> Use responsive sizing based on available width and height, avoid clipping, excessive whitespace or horizontal overflow
+>
+> Keep calculation state and API behavior unchanged, preserve keyboard accessibility and focus management
+
+### Outcome and checks
+
+- Large uses viewport-relative width, height, key and text sizes. Wide and short-landscape layouts place the readout beside the shared keypad. Narrow layouts stack them. Large history opens as a modal side or bottom drawer, preserving card geometry. Compact and Default retain their layouts and 76 rem dock breakpoint. Updated UI_SPEC.md.
+- `npm.cmd run coverage` passed all 57 tests with 92.20% line coverage and 85.91% branch coverage. Updated the size regression to query history after it is reopened. `npm.cmd run build` and all six live `npm.cmd run test:smoke` scenarios passed.
+- A temporary Chromium check covered 320×568 through 1920×1080, including 672×375 and 1024×420. It verified key targets of at least 44px, no horizontal overflow, keyboard order, tooltips, in-bounds scientific notation, and focus and history preservation when a dock becomes a modal. Early layout checks revealed a clipped tooltip in short landscape. Adjusted its sizing and spacing and reran the checks successfully. Inspected mobile, short-landscape, and desktop screenshots. At 1440×900, the card measured 1296×774 and Advanced keys were about 94px tall.
+
+## 2026-11-25 — Large readout and keypad refinement
+
+Tool — Codex (ChatGPT). Purpose — reduce unused display space and improve Large typography and short-screen layout.
+
+### Prompt
+
+> Refine the Large calculator layout, the overall structure looks good but the display still has too much unused space
+> Improve the visual balance between the expression and the result, make short results significantly larger and adapt typography for long values
+> Keep the keypad layout but refine spacing, proportions and the visual hierarchy of the controls
+> Make sure the layout adapts properly to shorter desktop viewports and Advanced mode without clipping
+> Keep Compact and Default unchanged, this refinement should only affect Large
+
+### Outcome and checks
+
+- Shortened the Large readout beside the keypad and kept the expression close to the value. Large adapts the value font by character count and available width and height. Long typed entries still scroll inside the readout. Adjusted Large-only key gaps, utility and Advanced labels, and Equals emphasis. Short landscape uses tighter spacing while keeping 44 px minimum targets. Updated UI_SPEC.md.
+- `npm.cmd run coverage` passed all 57 tests with 92.20% line and 85.98% branch coverage. `npm.cmd run build` and `npm.cmd run test:smoke` passed after correcting a CSS selector caught by the initial build. No calculation or API changes.
+- Chromium verified Advanced mode across nine viewport sizes from 320×568 to 1920×1080, including 672×375, 1024×420, and 1280×500. Checked no horizontal overflow, all keypad keys visible at 1024×420, in-bounds percentage tooltips, one-line scientific output, and 50-digit entry scrolling. At 1440×900, the five-digit result used 151 px type and a scientific result used 42 px. Inspected mobile, short-desktop, and desktop screenshots and verified Compact and Default kept their desktop geometry and typography.
