@@ -484,3 +484,67 @@ Tool — Codex (ChatGPT). Purpose — implement and verify power using the exist
 - `npm.cmd run coverage` passed all 28 frontend tests with 97.47% line, 95.34% statement, and 91.36% branch coverage. `npm.cmd run build` passed TypeScript checking and the Vite production build.
 - Windows Code Integrity blocked the temporary executable from `go run .`. Started the standalone build directly and ran `npm.cmd run test:smoke` against it and Vite. Both existing smoke scenarios passed. An additional live Chromium check verified that a pending power survived a switch to Standard, returned `8` for `2^3`, and showed the API's `INVALID_POWER` message for `(-2)^0.5`.
 - `git -c core.whitespace=cr-at-eol diff --check` passed with the specification's existing Windows line endings. No commit or push was made.
+
+## 2026-11-25 — Square root operation review
+
+Tool — Codex (ChatGPT). Purpose — review the unary square root contract, calculator state, and regression cases before implementation.
+
+### Prompt
+
+> Review the implementation of square root as the next advanced operation
+>
+> Check SPEC.md and the current architecture before making changes
+>
+> Use the existing POST /api/calculate endpoint with operation sqrt and a single operand
+>
+> Review how unary operations should interact with the current reducer, pending calculations and mode switching
+>
+> Consider negative inputs, zero, decimal values, error handling and numeric precision
+>
+> Identify any missing edge cases, necessary changes and relevant frontend and backend tests
+>
+> Keep the existing architecture, avoid unnecesary refactoring
+>
+> Report your recommendations before implementation
+
+### Outcome and checks
+
+- Reviewed the specification, Go calculator and HTTP handler, React reducer and request flow, and existing power and precision tests. Checked the standard library's documented `math.Sqrt` behavior.
+- Confirmed the approved unary request shape `{"operation":"sqrt","a":81}`. Recommend rejecting a supplied `b` (including null) or `percentage` as HTTP 400, and returning HTTP 422 with `INVALID_SQRT` for negative operands. Accept either sign of zero and display `0`. Keep decimal results at full float64 precision until display formatting.
+- Pending interaction recommendation is to apply square root immediately to the input or result, or to the entered right operand while retaining a pending binary operation. If the right operand is empty, leave the pending calculation alone. Preserve state and request identity when switching modes. Use an Advanced-only square-root button with accessible keyboard activation.
+- Recommended focused Go numerical cases, HTTP arity and domain cases, and React checks for unary payloads, full-precision chaining and negative-input recovery. No application changes were made and no suites were rerun. Only this log was updated.
+
+## 2026-11-25 — Advanced square root operation
+
+Tool — Codex (ChatGPT). Purpose — implement and verify square root as an immediate unary operation.
+
+### Prompt
+
+> Proceed with the square root implementation following the reviewed approach
+>
+> Apply sqrt to the active operand, preserving any pending binary operation. If theres no right operand yet, dont execute a request
+>
+> Use INVALID_SQRT with HTTP 422 for negative inputs, keep the value editable after an error
+>
+> Follow the existing API contract, b must be omitted and contextual percentage should be rejected
+>
+> Keep sqrt available only in Advanced mode, preserve calculator state when switching modes
+>
+> Reuse the current reducer and request handling, avoid unnecesary refactoring
+>
+> Implement the agreed Go, HTTP and React tests, including pending operations, precision, error recovery and mode switching
+>
+> Run all relevant tests, coverage checks, builds and the browser smoke test. Report the actual results
+
+### Decisions and outcome
+
+- Ramiro approved the [square root approach](#2026-11-25--square-root-operation-review). Apply it immediately to the active operand. Preserve pending operations and skip the request when a right operand is missing. Use an Advanced-only control and preserve calculator state across modes.
+- The existing endpoint accepts `{"operation":"sqrt","a":81}` and rejects a supplied `b` or `percentage` field. Negative inputs return HTTP 422 with `INVALID_SQRT` and leave the operand editable.
+- Added Go arithmetic and HTTP tests, and React tests covering standalone values, the precise right operand after a mode switch, and recovery. Reused the request lifecycle and held the computed operand at full precision for subsequent calculations. Updated the agreed behavior in the spec and README.
+
+### Checks run
+
+- On Windows with Go 1.25.0, `go test -count=1 -coverpkg=./... -coverprofile=coverage.out ./...`, `go tool cover -func=coverage.out`, `go vet ./...`, and `go build -o ../.tooling/calculator-api-sqrt.exe .` passed. Overall Go statement coverage was 94.1%, and `Sqrt` had 100.0% statement coverage.
+- `npm.cmd run coverage` passed all 31 frontend tests with 98.36% line, 96.21% statement, and 93.28% branch coverage. `npm.cmd run build` passed TypeScript checking and the Vite build.
+- Started the compiled Go API and Vite. `npm.cmd run test:smoke` passed both existing browser scenarios. A separate real-browser check verified no request for an empty right operand, preserved addition across a mode switch, sent the full `sqrt(2)` value to Go, and recovered from `INVALID_SQRT` by correcting `-9` to `9`.
+- `git -c core.whitespace=cr-at-eol diff --check` passed. No commit or push was made.

@@ -74,21 +74,32 @@ func calculate(w http.ResponseWriter, r *http.Request) {
 		apply = calculator.Divide
 	case "power":
 		apply = calculator.Power
+	case "sqrt":
+		apply = func(a, _ float64) (float64, error) { return calculator.Sqrt(a) }
 	default:
-		writeError(w, http.StatusBadRequest, "INVALID_REQUEST", "Supported operations are add, subtract, multiply, divide, and power.")
+		writeError(w, http.StatusBadRequest, "INVALID_REQUEST", "Supported operations are add, subtract, multiply, divide, power, and sqrt.")
 		return
 	}
 
 	a, hasA := readNumber(fields["a"])
 	b, hasB := readNumber(fields["b"])
-	if !hasA || !hasB {
+	if operation == "sqrt" {
+		if _, present := fields["b"]; present {
+			writeError(w, http.StatusBadRequest, "INVALID_REQUEST", "Omit b for square root.")
+			return
+		}
+		if !hasA {
+			writeError(w, http.StatusBadRequest, "INVALID_REQUEST", "Provide a finite JSON number for a.")
+			return
+		}
+	} else if !hasA || !hasB {
 		writeError(w, http.StatusBadRequest, "INVALID_REQUEST", "Provide finite JSON numbers for a and b.")
 		return
 	}
 
 	if percentage, present := fields["percentage"]; present {
-		if operation == "power" {
-			writeError(w, http.StatusBadRequest, "INVALID_REQUEST", "Omit percentage for power.")
+		if operation == "power" || operation == "sqrt" {
+			writeError(w, http.StatusBadRequest, "INVALID_REQUEST", "Omit percentage for this operation.")
 			return
 		}
 		if string(percentage) != "false" {
@@ -100,6 +111,10 @@ func calculate(w http.ResponseWriter, r *http.Request) {
 	result, err := apply(a, b)
 	if errors.Is(err, calculator.ErrDivisionByZero) {
 		writeError(w, http.StatusUnprocessableEntity, "DIVISION_BY_ZERO", "Division by zero is not allowed.")
+		return
+	}
+	if errors.Is(err, calculator.ErrInvalidSqrt) {
+		writeError(w, http.StatusUnprocessableEntity, "INVALID_SQRT", "Square root requires a non-negative number.")
 		return
 	}
 	if errors.Is(err, calculator.ErrNonFiniteResult) {

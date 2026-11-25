@@ -33,15 +33,26 @@ export function CalculatorKeypad({ advanced, loading, onAction }: Props) {
       <button type="button" disabled={loading} onClick={() => onAction({ type: 'decimal' })} aria-label="Decimal point">.</button>
       <button type="button" className={styles.equals} disabled={loading} onClick={() => onAction({ type: 'equals' })} aria-label="Equals">=</button>
       {advanced && (
-        <button
-          type="button"
-          className={`${styles.operator} ${styles.power}`}
-          disabled={loading}
-          onClick={() => onAction({ type: 'power' })}
-          aria-label="Power"
-        >
-          xʸ
-        </button>
+        <>
+          <button
+            type="button"
+            className={`${styles.operator} ${styles.advancedOperator}`}
+            disabled={loading}
+            onClick={() => onAction({ type: 'power' })}
+            aria-label="Power"
+          >
+            xʸ
+          </button>
+          <button
+            type="button"
+            className={`${styles.operator} ${styles.advancedOperator}`}
+            disabled={loading}
+            onClick={() => onAction({ type: 'sqrt' })}
+            aria-label="Square root"
+          >
+            √
+          </button>
+        </>
       )}
     </div>
   )

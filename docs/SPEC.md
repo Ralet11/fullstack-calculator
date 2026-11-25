@@ -31,6 +31,7 @@ Behavior:
 - On a mathematical or network error, show an understandable message and preserve the editable inputs so the user can correct or retry. Clear always remains available.
 Keyboard: digits 0–9, ., +, -, *, /, Enter or = to calculate, Backspace to delete, and Escape to clear. Buttons must also work with mouse and touch. The interface must remain usable on narrow mobile screens, with readable results and visible keyboard focus.
 In Advanced mode, the xʸ button and ^ key start a power operation. Switching to Standard mode hides the button and disables that shortcut while preserving any pending calculation.
+The Advanced mode √ button applies square root immediately to the input or result. When a binary operation is pending, it applies to the entered right operand and preserves the pending operator. For example, 2 + 9 √ = displays 5. With no right operand entered, √ leaves the pending calculation alone and sends no request. On error, the operand remains editable.
 4. Percentages
 Support two distinct operations, with explicit UI controls:
 
@@ -56,6 +57,7 @@ Success (200 OK):
 {"result":60}
 Square root is unary; b must be omitted:
 {"operation":"sqrt","a":81}
+Also omit percentage. A negative operand returns HTTP 422 with INVALID_SQRT and the message "Square root requires a non-negative number."
 Direct percentage of a value (two operands):
 {"operation":"percentage","a":150,"b":20}
 Contextual percentage uses the existing arithmetic operation plus an optional boolean modifier:

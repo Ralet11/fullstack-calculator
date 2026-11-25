@@ -1,5 +1,5 @@
 import { useEffect, useReducer, useRef } from 'react'
-import { requestCalculation } from './calculatorApi'
+import { requestCalculation, type CalculationRequest } from './calculatorApi'
 import { calculatorReducer, initialState, type CalculatorAction, type Operation } from './calculatorReducer'
 
 export function useCalculator() {
@@ -14,15 +14,17 @@ export function useCalculator() {
     }
   }, [])
 
-  async function calculate(operation: Operation, a: number, b: number, nextOperation: Operation | null) {
+  async function calculate(calculation: CalculationRequest, nextOperation: Operation | null = null) {
     const request = new AbortController()
     activeRequest.current = request
     dispatch({ type: 'requestStarted' })
 
     try {
-      const result = await requestCalculation(operation, a, b, request.signal)
+      const result = await requestCalculation(calculation, request.signal)
       if (activeRequest.current === request) {
-        dispatch({ type: 'requestSucceeded', result, nextOperation })
+        dispatch(calculation.operation === 'sqrt'
+          ? { type: 'unarySucceeded', result }
+          : { type: 'requestSucceeded', result, nextOperation })
       }
     } catch (error) {
       if (activeRequest.current === request) {
@@ -54,26 +56,27 @@ export function useCalculator() {
         return
     }
 
-    const { pending } = state
-    const nextOperation = action.type === 'equals' ? null : action.type
-    if (nextOperation === null && pending === null) return
+    const { entry, pending, result } = state
+    if (action.type === 'equals' && pending === null) return
 
-    if (state.entry === '') {
-      const left = pending?.left ?? state.result
-      if (nextOperation !== null && nextOperation !== pending?.operation && left !== null) {
-        dispatch({ type: 'setPending', pending: { left, operation: nextOperation } })
+    const nextOperation = action.type === 'equals' || action.type === 'sqrt' ? null : action.type
+    if (entry === '' && result === null) {
+      if (pending !== null && nextOperation !== null && nextOperation !== pending.operation) {
+        dispatch({ type: 'setPending', pending: { ...pending, operation: nextOperation } })
       }
       return
     }
 
-    const value = Number(state.entry)
-    if (state.entry === '-' || state.entry.endsWith('.') || !Number.isFinite(value)) {
+    const value = result ?? Number(entry)
+    if (entry === '-' || entry.endsWith('.') || !Number.isFinite(value)) {
       dispatch({ type: 'requestFailed', message: 'Enter a complete number within the supported range.' })
       return
     }
 
-    if (pending !== null) {
-      void calculate(pending.operation, pending.left, value, nextOperation)
+    if (action.type === 'sqrt') {
+      void calculate({ operation: 'sqrt', a: value })
+    } else if (pending !== null) {
+      void calculate({ operation: pending.operation, a: pending.left, b: value }, nextOperation)
     } else if (nextOperation !== null) {
       dispatch({ type: 'setPending', pending: { left: value, operation: nextOperation } })
     }

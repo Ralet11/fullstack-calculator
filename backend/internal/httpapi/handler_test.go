@@ -26,6 +26,7 @@ func TestCalculate(t *testing.T) {
 		{"divide without rounding quotient", `{"operation":"divide","a":1,"b":3}`, 0.3333333333333333},
 		{"zero dividend", `{"operation":"divide","a":0,"b":5}`, 0},
 		{"power uses a as the base", `{"operation":"power","a":2,"b":3}`, 8},
+		{"square root with one operand", `{"operation":"sqrt","a":81}`, 9},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			recorder := sendRequest(http.MethodPost, "application/json; charset=utf-8", test.body)
@@ -56,6 +57,11 @@ func TestCalculateRejectsInvalidBodies(t *testing.T) {
 		{"invalid operation type", `{"operation":1,"a":2,"b":3}`},
 		{"unsupported operation", `{"operation":"unknown","a":2,"b":3}`},
 		{"power missing exponent", `{"operation":"power","a":2}`},
+		{"square root missing operand", `{"operation":"sqrt"}`},
+		{"square root with a second operand", `{"operation":"sqrt","a":9,"b":2}`},
+		{"square root with null second operand", `{"operation":"sqrt","a":9,"b":null}`},
+		{"square root with a percentage modifier", `{"operation":"sqrt","a":9,"percentage":true}`},
+		{"square root with a false percentage modifier", `{"operation":"sqrt","a":9,"percentage":false}`},
 		{"power with a percentage modifier", `{"operation":"power","a":2,"b":3,"percentage":true}`},
 		{"power with a false percentage modifier", `{"operation":"power","a":2,"b":3,"percentage":false}`},
 		{"missing left", `{"operation":"add","b":3}`},
@@ -124,6 +130,14 @@ func TestCalculateRejectsInvalidRealPowers(t *testing.T) {
 				t.Errorf("message = %q; want %q", message, test.wantMessage)
 			}
 		})
+	}
+}
+
+func TestCalculateRejectsNegativeSquareRoot(t *testing.T) {
+	recorder := sendRequest(http.MethodPost, "application/json", `{"operation":"sqrt","a":-1}`)
+	message := checkError(t, recorder, http.StatusUnprocessableEntity, "INVALID_SQRT")
+	if message != "Square root requires a non-negative number." {
+		t.Errorf("unexpected square root error message: %q", message)
 	}
 }
 

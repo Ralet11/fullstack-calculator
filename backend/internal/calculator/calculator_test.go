@@ -183,3 +183,29 @@ func TestPowerRejectsOverflow(t *testing.T) {
 		t.Errorf("Power(1e308, 2) error = %v; want ErrNonFiniteResult", err)
 	}
 }
+
+func TestSqrt(t *testing.T) {
+	for _, test := range []struct {
+		name        string
+		value, want float64
+	}{
+		{"perfect square", 81, 9},
+		{"decimal", 0.25, 0.5},
+		{"zero", 0, 0},
+		{"negative zero", math.Copysign(0, -1), 0},
+		{"irrational result", 2, math.Sqrt2},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			got, err := Sqrt(test.value)
+			if err != nil || got != test.want {
+				t.Fatalf("Sqrt(%g) = %g, %v; want %g", test.value, got, err, test.want)
+			}
+		})
+	}
+}
+
+func TestSqrtRejectsNegativeOperand(t *testing.T) {
+	if _, err := Sqrt(-1); !errors.Is(err, ErrInvalidSqrt) {
+		t.Errorf("Sqrt(-1) error = %v; want ErrInvalidSqrt", err)
+	}
+}

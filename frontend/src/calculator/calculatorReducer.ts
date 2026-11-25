@@ -4,7 +4,7 @@ type EntryAction =
 
 export type Operation = 'add' | 'subtract' | 'multiply' | 'divide' | 'power'
 
-export type CalculatorAction = EntryAction | { type: Operation | 'equals' | 'clear' }
+export type CalculatorAction = EntryAction | { type: Operation | 'sqrt' | 'equals' | 'clear' }
 
 type PendingOperation = { left: number; operation: Operation }
 
@@ -21,6 +21,7 @@ type StateAction =
   | { type: 'clear' | 'requestStarted' }
   | { type: 'setPending'; pending: PendingOperation }
   | { type: 'requestSucceeded'; result: number; nextOperation: Operation | null }
+  | { type: 'unarySucceeded'; result: number }
   | { type: 'requestFailed'; message: string }
 
 export const initialState: CalculatorState = {
@@ -72,6 +73,8 @@ export function calculatorReducer(state: CalculatorState, action: StateAction): 
         }
       }
       return { ...initialState, entry: '', result: action.result }
+    case 'unarySucceeded':
+      return { ...state, entry: '', result: action.result, loading: false, error: null }
     case 'requestFailed':
       return { ...state, loading: false, error: action.message }
   }

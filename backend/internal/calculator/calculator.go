@@ -7,6 +7,7 @@ import (
 
 var ErrNonFiniteResult = errors.New("the calculation exceeds the supported number range")
 var ErrDivisionByZero = errors.New("division by zero is not allowed")
+var ErrInvalidSqrt = errors.New("square root requires a non-negative number")
 
 func Add(a, b float64) (float64, error) {
 	return checkedResult(a + b)
@@ -41,6 +42,13 @@ func Power(base, exponent float64) (float64, error) {
 		return 0, InvalidPowerError("A negative base requires an integer exponent.")
 	}
 	return checkedResult(math.Pow(base, exponent))
+}
+
+func Sqrt(value float64) (float64, error) {
+	if value < 0 {
+		return 0, ErrInvalidSqrt
+	}
+	return checkedResult(math.Sqrt(value))
 }
 
 func checkedResult(result float64) (float64, error) {

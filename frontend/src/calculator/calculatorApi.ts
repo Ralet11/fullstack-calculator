@@ -1,12 +1,16 @@
 import type { Operation } from './calculatorReducer'
 
-export async function requestCalculation(operation: Operation, a: number, b: number, signal: AbortSignal): Promise<number> {
+export type CalculationRequest =
+  | { operation: Operation; a: number; b: number }
+  | { operation: 'sqrt'; a: number }
+
+export async function requestCalculation(calculation: CalculationRequest, signal: AbortSignal): Promise<number> {
   let response: Response
   try {
     response = await fetch('/api/calculate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ operation, a, b }),
+      body: JSON.stringify(calculation),
       signal,
     })
   } catch {

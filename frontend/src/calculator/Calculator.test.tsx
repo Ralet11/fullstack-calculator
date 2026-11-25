@@ -479,3 +479,75 @@ describe('advanced power', () => {
     expect(value()).toBe('8')
   })
 })
+
+describe('advanced square root', () => {
+  it('applies to a standalone input or result in Advanced mode', async () => {
+    fetchMock.mockResolvedValueOnce(reply(9)).mockResolvedValueOnce(reply(3))
+    const { press, user, value } = openCalculator()
+
+    expect(screen.queryByRole('button', { name: 'Square root' })).toBeNull()
+    await press('Advanced')
+    await user.keyboard('81')
+    await press('Square root')
+
+    expect(requestBody()).toEqual({ operation: 'sqrt', a: 81 })
+    await waitFor(() => expect(value()).toBe('9'))
+    await press('Square root')
+    expect(requestBody(1)).toEqual({ operation: 'sqrt', a: 9 })
+    await waitFor(() => expect(value()).toBe('3'))
+  })
+
+  it('preserves the pending operation and uses the full right operand across modes', async () => {
+    const response = deferredResponse()
+    const root = 1.4142135623730951
+    fetchMock.mockReturnValueOnce(response.promise).mockResolvedValueOnce(reply(2 + root))
+    const { press, user, value } = openCalculator()
+
+    await press('Advanced')
+    await user.keyboard('2+')
+    await press('Square root')
+    expect(fetchMock).not.toHaveBeenCalled()
+    expect(screen.getByText('2 +')).toBeTruthy()
+
+    await user.keyboard('2')
+    await press('Square root')
+    expect(requestBody()).toEqual({ operation: 'sqrt', a: 2 })
+    await press('Standard')
+    expect(screen.queryByRole('button', { name: 'Square root' })).toBeNull()
+    expect(screen.getByText('Calculating…')).toBeTruthy()
+
+    await act(async () => response.resolve(reply(root)))
+    expect(screen.getByText('2 +')).toBeTruthy()
+    expect(value()).toBe('1.41421356237')
+    await user.keyboard('=')
+    expect(requestBody(1)).toEqual({ operation: 'add', a: 2, b: root })
+    await waitFor(() => expect(value()).toBe('3.41421356237'))
+  })
+
+  it('allows correcting and retrying square root after a negative-input error', async () => {
+    fetchMock
+      .mockResolvedValueOnce(Response.json({
+        error: { code: 'INVALID_SQRT', message: 'Square root requires a non-negative number.' },
+      }, { status: 422 }))
+      .mockResolvedValueOnce(reply(3))
+    const { press, user, value } = openCalculator()
+
+    await press('Advanced')
+    await user.keyboard('2+')
+    await press('Toggle sign')
+    await user.keyboard('9')
+    await press('Square root')
+    expect(requestBody()).toEqual({ operation: 'sqrt', a: -9 })
+    expect((await screen.findByRole('alert')).textContent).toBe('Square root requires a non-negative number.')
+    expect(screen.getByText('2 +')).toBeTruthy()
+    expect(value()).toBe('-9')
+
+    await press('Toggle sign')
+    expect(value()).toBe('9')
+    await press('Square root')
+    expect(requestBody(1)).toEqual({ operation: 'sqrt', a: 9 })
+    await waitFor(() => expect(value()).toBe('3'))
+    expect(screen.getByText('2 +')).toBeTruthy()
+    expect(screen.queryByRole('alert')).toBeNull()
+  })
+})

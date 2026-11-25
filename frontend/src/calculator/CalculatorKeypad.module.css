@@ -58,8 +58,8 @@
   color: var(--key);
 }
 
-.keypad .power {
-  grid-column: 1 / -1;
+.keypad .advancedOperator {
+  grid-column: span 2;
 }
 
 .zero {
