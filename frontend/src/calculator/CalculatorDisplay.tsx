@@ -46,39 +46,53 @@ export function CalculatorDisplay({ ref, size, value, animationRequest, typing, 
     .join(' ')
 
   return (
-    <div className={styles.display}>
-      <div className={styles.header}>
-        <div
-          ref={expressionRef}
-          className={styles.expression}
-          role="group"
-          aria-label="Calculation expression"
-          aria-hidden={!expression}
-          tabIndex={expression ? 0 : undefined}
-        >
-          {expression}
+    <div className={styles.screen}>
+      <div className={styles.display}>
+        <div className={styles.header}>
+          <div
+            ref={expressionRef}
+            className={styles.expression}
+            role="group"
+            aria-label="Calculation expression"
+            aria-hidden={!expression}
+            tabIndex={expression ? 0 : undefined}
+          >
+            {expression}
+          </div>
+          <span className={styles.activity} role="status">
+            {showLoading && (
+              <>
+                <span className={styles.activityDots} aria-hidden="true" />
+                <span className={styles.visuallyHidden}>Calculating…</span>
+              </>
+            )}
+          </span>
         </div>
-        <span className={styles.activity} role="status">
-          {showLoading && (
-            <>
-              <span className={styles.activityDots} aria-hidden="true" />
-              <span className={styles.visuallyHidden}>Calculating…</span>
-            </>
-          )}
-        </span>
+        <output
+          ref={ref}
+          className={valueClass}
+          style={size === 'Large' ? { '--large-value-length': value.length } as CSSProperties : undefined}
+          aria-label="Calculator display"
+          aria-live="off"
+          tabIndex={0}
+        >
+          {value}
+        </output>
+        <div role="status" aria-label="Calculation result" className={styles.visuallyHidden}>{announcedResult === null ? '' : 'Result: ' + announcedResult}</div>
       </div>
-      <output
-        ref={ref}
-        className={valueClass}
-        style={size === 'Large' ? { '--large-value-length': value.length } as CSSProperties : undefined}
-        aria-label="Calculator display"
-        aria-live="off"
-        tabIndex={0}
-      >
-        {value}
-      </output>
-      <div role="status" aria-label="Calculation result" className={styles.visuallyHidden}>{announcedResult === null ? '' : 'Result: ' + announcedResult}</div>
-      {error && <p className={styles.error} role="alert">{error}</p>}
+      <div className={styles.feedback}>
+        {error ? (
+          <p className={styles.error} role="alert" tabIndex={0}>
+            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round">
+              <circle cx="12" cy="12" r="9" />
+              <path d="M12 7.5v5m0 3.5h.01" />
+            </svg>
+            <span>{error}</span>
+          </p>
+        ) : (
+          <p className={styles.hint}><kbd>Enter</kbd> calculate · <kbd>Esc</kbd> clear</p>
+        )}
+      </div>
     </div>
   )
 }

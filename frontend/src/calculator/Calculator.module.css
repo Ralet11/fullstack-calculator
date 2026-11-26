@@ -16,21 +16,20 @@
 
 [data-size="Large"] .calculator {
   min-block-size: 86svh;
-  grid-template-rows: auto auto minmax(min-content, 1fr) auto;
+  grid-template-rows: auto auto minmax(min-content, 1fr);
 }
 
 @media (min-width: 60rem), (min-width: 42rem) and (max-height: 36rem) {
   [data-size="Large"] .calculator {
     grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
-    grid-template-rows: auto minmax(min-content, 1fr) auto;
+    grid-template-rows: auto minmax(min-content, 1fr);
   }
 
   [data-size="Large"] .calculator > header {
     min-block-size: 3.5rem;
   }
 
-  [data-size="Large"] .calculator > header,
-  [data-size="Large"] .hint {
+  [data-size="Large"] .calculator > header {
     grid-column: 1 / -1;
   }
 }
@@ -40,17 +39,4 @@
     padding: var(--space-2);
     gap: var(--space-2);
   }
-}
-
-.hint {
-  margin: 0;
-  color: var(--muted);
-  font-size: var(--text-xs);
-  text-align: center;
-}
-
-.hint kbd {
-  font: inherit;
-  font-weight: var(--weight-semibold);
-  color: var(--ink);
 }

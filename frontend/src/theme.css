@@ -48,7 +48,8 @@
   --display-edge: #526581;
   --display-ink: #fafbff;
   --display-muted: #b9ccff;
-  --display-error: #ffc4b6;
+  --error-surface: #f6e9e5;
+  --error-ink: #783c36;
   --focus: #2148c7;
   --disabled-opacity: 0.52;
 

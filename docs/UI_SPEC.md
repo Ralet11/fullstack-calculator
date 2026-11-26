@@ -15,7 +15,7 @@ The functional spec describes Escape as Clear. Open menus and panels handle Esca
 ## Layout and responsive behavior
 
 - Use a top-aligned page with a single calculator card. Keep display, mode controls, keypad, and Advanced controls associated within that card. Give neighboring sections room to grow in normal page flow.
-- In Compact and Default, order the calculator header, display, and shared keypad vertically. The header contains a hamburger Modes button with the current mode label and History, with an adjacent Info button in Advanced. Keep the short keyboard hint below the controls.
+- In Compact and Default, order the calculator header, display, and shared keypad vertically. The header contains a hamburger Modes button with the current mode label and History, with an adjacent Info button in Advanced. Show keyboard hints and errors in a reserved area below the display.
 - Center the card in a page shell capped at `29rem`, including gutters. Use about 12 px side gutters at 320 and 375 px. Keep the title above the card.
 - Keep the main keypad in four columns. Use `CE C ⌫` across the first row in Standard and `CE C % ⌫` in Advanced. In Advanced, power and square root split the first three columns of row two equally, with division in the fourth. Finish Advanced with `7 8 9 ×`, `4 5 6 −`, `1 2 3 +`, and `± 0 . =`. Standard uses full rows for common keys, with operators in the right column and a full-width Equals button in the last row. Allow vertical page scrolling on short screens.
 - In Compact and Default, dock Recent calculations beside the centered card at `76rem` or wider and use a modal bottom drawer below that breakpoint. Large uses a modal side drawer on wide screens and a bottom drawer on narrower screens. History is closed by default and opening it preserves calculator width and key positions.
@@ -29,7 +29,7 @@ Use semantic CSS custom properties in [theme.css](../frontend/src/theme.css) and
 | Role | Baseline |
 | --- | --- |
 | Surfaces and text | Warm page `#E8E4DC`, card `#FAF7F1`, body text `#202B3C`, muted text `#536174`, edge `#DDD8CF`. |
-| Display | Ink-blue `#14233B`, light result text `#FAFBFF`, muted information `#B9CCFF`, error accent `#FFC4B6`. Show errors in text. |
+| Display | Ink-blue `#14233B`, light result text `#FAFBFF`, muted information `#B9CCFF`, errors on a pale warm-red surface `#F6E9E5` with dark text `#783C36`. |
 | Controls | Neutral digit keys, muted utility and Advanced keys, pale-blue standard operators `#E8EEFF`, and solid cobalt Equals `#2148C7` with white text. Give selected mode and marked contextual percentage a distinct treatment. Tint CE green and Backspace red. |
 | Typography | System UI, tabular numeric figures, and monospace for exact values and key names. Use 12–14 px for secondary text and about 20 px for digit keys at default settings. Make the display the largest numeric element. |
 | Spacing and shape | 4 px spacing base, 8 px keypad gaps, 8/12/20 px radii, a restrained card shadow and subtle key edges. Primary and touch controls are at least 44 px tall. Main key rows can grow to 52 px on taller tablet and desktop layouts. |
@@ -78,7 +78,7 @@ Use semantic CSS custom properties in [theme.css](../frontend/src/theme.css) and
 
 - Use native buttons for keys and disclosures, descriptive accessible names for symbolic keys, and `aria-pressed` for mode and contextual percentage. Use `aria-expanded` on each disclosure trigger and associate it with the controlled region. Collapsed content stays out of the Tab order. [W3C disclosure pattern](https://www.w3.org/WAI/ARIA/apg/patterns/disclosure/)
 - Preserve the row-by-row key order and visible focus in both modes. History controls retain their own focus and native activation. The open mode menu and modal history handle Escape first. Escape in the focused desktop history panel closes it. Open Advanced help also consumes Escape before calculator Clear.
-- Announce accepted results politely, announce delayed loading, and expose errors as alerts. Reading or entering digits should leave the result announcement quiet. Keep Clear and mode switching available during loading. If Equals initiates a request from the keyboard, keep it focused while it reports itself unavailable. Ignore repeat activation until the request settles and preserve the visible focus indicator.
+- Announce accepted results politely, announce delayed loading, and expose errors as alerts. The reserved feedback area keeps the expression, display and keypad in place. Long error messages can scroll within the alert. Reading or entering digits should leave the result announcement quiet. Keep Clear and mode switching available during loading. If Equals initiates a request from the keyboard, keep it focused while it reports itself unavailable. Ignore repeat activation until the request settles and preserve the visible focus indicator.
 - Target at least 4.5:1 contrast for normal text and 3:1 for focus indicators and meaningful control-state cues against adjacent colors. Combine color with text, shape, outline or state styling where needed. [W3C text contrast](https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum.html) · [W3C non-text contrast](https://www.w3.org/WAI/WCAG22/Understanding/non-text-contrast.html)
 
 ## Acceptance checks

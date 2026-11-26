@@ -238,9 +238,6 @@ export function Calculator({ size, onSizeChange }: Props) {
           helpId={helpId}
           onAction={send}
         />
-        <p className={styles.hint}>
-          <kbd>Enter</kbd> calculate · <kbd>Esc</kbd> clear
-        </p>
       </section>
       {advanced && <CalculatorAdvancedHelp id={helpId} open={helpOpen} docked={historyDocked} dialog={helpDialog} onClose={() => closeHelp()} />}
       <CalculatorHistory

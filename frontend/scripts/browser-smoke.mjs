@@ -46,10 +46,15 @@ try {
   await button('8').click()
   await button('Divide').click()
   await button('0').click()
+  const keypadBeforeError = await page.locator('[data-calculator-keys]').boundingBox()
+  const outputBeforeError = await display.boundingBox()
   const { error } = await pressCalculation('Equals', { operation: 'divide', a: 8, b: 0 }, 422)
   assert.equal(error.code, 'DIVISION_BY_ZERO')
   const alert = page.getByRole('alert')
-  await alert.and(page.getByText(error.message, { exact: true })).waitFor()
+  await alert.getByText(error.message, { exact: true }).waitFor()
+  await alert.locator('svg[aria-hidden="true"]').waitFor()
+  assert.deepEqual(await display.boundingBox(), outputBeforeError)
+  assert.deepEqual(await page.locator('[data-calculator-keys]').boundingBox(), keypadBeforeError)
   await expectDisplay('0')
 
   await button('Backspace').click()
@@ -60,7 +65,7 @@ try {
   )
   await expectDisplay('4')
   await alert.waitFor({ state: 'hidden' })
-  console.log('PASS 8 ÷ 0 shows the Go error, then correcting the divisor to 2 gives 4')
+  console.log('PASS 8 ÷ 0 shows a stable Go error alert, then correcting the divisor to 2 gives 4')
 
   await button('Clear').click()
   await selectMode('Advanced')
@@ -76,7 +81,7 @@ try {
     'Equals', { operation: 'divide', a: 150, b: 0, percentage: true }, 422,
   )
   assert.equal(percentageError.code, 'DIVISION_BY_ZERO')
-  await alert.and(page.getByText(percentageError.message, { exact: true })).waitFor()
+  await alert.getByText(percentageError.message, { exact: true }).waitFor()
   await expectDisplay('0%')
 
   await selectMode('Advanced')
