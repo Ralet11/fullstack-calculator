@@ -3,7 +3,7 @@ import { editableDecimal } from './calculatorEntry'
 type EntryAction =
   | { type: 'digit'; digit: string }
   | { type: 'paste'; entry: string }
-  | { type: 'decimal' | 'sign' | 'backspace' | 'togglePercentage' }
+  | { type: 'decimal' | 'sign' | 'backspace' | 'togglePercentage' | 'clearEntry' }
 
 export type Operation = 'add' | 'subtract' | 'multiply' | 'divide' | 'power' | 'percentage'
 
@@ -15,6 +15,8 @@ export type CalculatorState = {
   entry: string
   pending: PendingOperation | null
   result: number | null
+  percentageBase: number | null
+  confirmedEntry: string | null
   loading: boolean
   error: string | null
 }
@@ -23,6 +25,7 @@ type StateAction =
   | EntryAction
   | { type: 'clear' | 'requestStarted' }
   | { type: 'setPending'; pending: PendingOperation }
+  | { type: 'confirmEntry'; result: number }
   | { type: 'requestSucceeded'; result: number; nextOperation: Operation | null }
   | { type: 'unarySucceeded'; result: number }
   | { type: 'requestFailed'; message: string }
@@ -31,6 +34,8 @@ export const initialState: CalculatorState = {
   entry: '0',
   pending: null,
   result: null,
+  percentageBase: null,
+  confirmedEntry: null,
   loading: false,
   error: null,
 }
@@ -39,21 +44,34 @@ export function calculatorReducer(state: CalculatorState, action: StateAction): 
   switch (action.type) {
     case 'clear':
       return initialState
+    case 'clearEntry':
+      return {
+        ...state,
+        entry: '0',
+        pending: state.pending?.percentage ? { ...state.pending, percentage: false } : state.pending,
+        result: null,
+        confirmedEntry: null,
+        loading: false,
+        error: null,
+      }
     case 'paste':
-      return { ...state, entry: action.entry, result: null, error: null }
+      return { ...state, entry: action.entry, result: null, confirmedEntry: null, error: null }
     case 'digit': {
       const entry = state.result === null ? editableDecimal(state.entry) : ''
       const prefix = entry === '0' ? '' : entry === '-0' ? '-' : entry
-      return { ...state, entry: prefix + action.digit, result: null, error: null }
+      return { ...state, entry: prefix + action.digit, result: null, confirmedEntry: null, error: null }
     }
     case 'decimal': {
       const entry = state.result === null ? editableDecimal(state.entry) : ''
       if (entry.includes('.')) return state
       const prefix = entry === '' || entry === '-' ? entry + '0' : entry
-      return { ...state, entry: prefix + '.', result: null, error: null }
+      return { ...state, entry: prefix + '.', result: null, confirmedEntry: null, error: null }
     }
     case 'sign':
-      if (state.result !== null) return { ...state, result: -state.result, error: null }
+      if (state.result !== null) {
+        const result = -state.result
+        return { ...state, result, percentageBase: state.pending === null ? result : state.percentageBase, confirmedEntry: null, error: null }
+      }
       if (state.entry === '' || state.entry === '0') {
         return { ...state, entry: '-', error: null }
       }
@@ -78,6 +96,8 @@ export function calculatorReducer(state: CalculatorState, action: StateAction): 
     }
     case 'setPending':
       return { ...initialState, pending: action.pending, entry: '' }
+    case 'confirmEntry':
+      return { ...initialState, entry: '', result: action.result, percentageBase: action.result, confirmedEntry: state.entry }
     case 'requestStarted':
       return { ...state, loading: true, error: null }
     case 'requestSucceeded':
@@ -88,9 +108,17 @@ export function calculatorReducer(state: CalculatorState, action: StateAction): 
           entry: '',
         }
       }
-      return { ...initialState, entry: '', result: action.result }
+      return { ...initialState, entry: '', result: action.result, percentageBase: action.result }
     case 'unarySucceeded':
-      return { ...state, entry: '', result: action.result, loading: false, error: null }
+      return {
+        ...state,
+        entry: '',
+        result: action.result,
+        percentageBase: state.pending === null ? action.result : state.percentageBase,
+        confirmedEntry: null,
+        loading: false,
+        error: null,
+      }
     case 'requestFailed':
       return { ...state, loading: false, error: action.message }
   }

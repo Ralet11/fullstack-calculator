@@ -12,7 +12,7 @@
   z-index: 1;
   inset-block-start: 0;
   inset-inline-start: calc(100% + var(--space-4));
-  width: 19.5rem;
+  width: min(19.5rem, calc((100dvw - 100%) / 2 - var(--space-6)));
   max-height: calc(100svh - 5rem);
   overflow: auto;
   overscroll-behavior: contain;

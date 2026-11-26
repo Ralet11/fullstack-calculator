@@ -11,6 +11,10 @@ type Props = {
   menuOpen: boolean
   historyOpen: boolean
   historyId: string
+  helpId: string
+  helpOpen: boolean
+  helpButton: RefObject<HTMLButtonElement | null>
+  onHelpToggle: () => void
   modesButton: RefObject<HTMLButtonElement | null>
   historyButton: RefObject<HTMLButtonElement | null>
   onMenuOpenChange: (open: boolean) => void
@@ -19,7 +23,7 @@ type Props = {
 }
 
 export function CalculatorHeader({
-  advanced, size, onSizeChange, menuOpen, historyOpen, historyId, modesButton, historyButton,
+  advanced, size, onSizeChange, menuOpen, historyOpen, historyId, helpId, helpOpen, helpButton, onHelpToggle, modesButton, historyButton,
   onMenuOpenChange, onModeChange, onHistoryToggle,
 }: Props) {
   const menuId = useId()
@@ -95,17 +99,35 @@ export function CalculatorHeader({
           </div>
         </div>
       </div>
-      <button
-        ref={historyButton}
-        type="button"
-        className={styles.history}
-        aria-expanded={historyOpen}
-        aria-controls={historyId}
-        onClick={onHistoryToggle}
-      >
-        <span className={styles.clock} aria-hidden="true" />
-        History
-      </button>
+      <div className={styles.actions}>
+        {advanced && (
+          <button
+            ref={helpButton}
+            type="button"
+            className={styles.info}
+            aria-label="Advanced help"
+            aria-controls={helpId}
+            aria-expanded={helpOpen}
+            onClick={onHelpToggle}
+          >
+            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round">
+              <circle cx="12" cy="12" r="9" />
+              <path d="M12 11v5M12 8h.01" />
+            </svg>
+          </button>
+        )}
+        <button
+          ref={historyButton}
+          type="button"
+          className={styles.history}
+          aria-expanded={historyOpen}
+          aria-controls={historyId}
+          onClick={onHistoryToggle}
+        >
+          <span className={styles.clock} aria-hidden="true" />
+          History
+        </button>
+      </div>
     </header>
   )
 }

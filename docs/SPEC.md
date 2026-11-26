@@ -8,7 +8,7 @@ The implementation includes the four required arithmetic operations and the thre
 2. Scope
 Standard mode: addition (add), subtraction (subtract), multiplication (multiply), and division (divide).
 
-Advanced mode: all Standard operations plus exponentiation (power), square root (sqrt), and a contextual % key. The API also supports direct percentage of a value (percentage).
+Advanced mode: all Standard operations plus exponentiation (power), square root (sqrt), and the % key.
 
 Contextual percentage: the % key modifies the second operand of a pending addition, subtraction, multiplication, or division.
 
@@ -18,14 +18,14 @@ The calculator uses sequential evaluation, not operator precedence:
 - 25 → + → 15 → = displays 40.
 - 10 → + → 5 → × → 2 → = displays 30 (evaluate 10 + 5 before × 2).
 Behavior:
-- = evaluates the pending operation. Repeated = keeps the result; it does not repeat the operation.
+- = evaluates the pending operation. With a standalone number it confirms the value and shows the number followed by = without sending a request. Repeated = keeps the result.
 - Changing the operator before entering the second operand replaces the pending operator.
 - Choosing another operator after entering the second operand evaluates the pending operation, then starts the next one.
 - After =, entering a digit starts a new calculation; choosing an operator continues from the result.
-- C clears all calculation state. Backspace edits the current input, and ± changes its sign.
+- CE resets the current entry to zero, keeping the pending operator and left operand. It clears the current rate marker or error and cancels any request for that entry. C clears all calculation state. Backspace removes one character from the current input, and ± changes its sign.
 - A number may contain at most one decimal point. The entry display supports zero, negative values, and decimals, including intermediate typing states such as - and 0.; incomplete entries cannot be submitted.
 - Switching Standard/Advanced modes preserves the current calculation, including a pending operation.
-- While an API request is pending, display a loading state and prevent a duplicate calculation. Clear and mode switching remain available.
+- While a request is pending, keep keys usable and apply new keystrokes in order after success. Ignore duplicate Equals before new input. Clear cancels the request and buffered input. On error discard buffered input so the failed calculation remains editable.
 - Clearing the calculation or starting a newer calculation invalidates outstanding responses so late HTTP results cannot overwrite the current state.
 - On a mathematical or network error, show an understandable message and preserve the editable inputs so the user can correct or retry. Clear always remains available.
 Keyboard: digits 0–9, ., +, -, *, /, Enter or = to calculate, Backspace to delete, and Escape to clear. Buttons must also work with mouse and touch. The interface must remain usable on narrow mobile screens, with readable results and visible keyboard focus.
@@ -33,7 +33,7 @@ In Advanced mode, the xʸ button and ^ key start a power operation. Switching to
 The Advanced mode √ button applies square root immediately to the input or result. When a binary operation is pending, it applies to the entered right operand and preserves the pending operator. For example, 2 + 9 √ = displays 5. With no right operand entered, √ leaves the pending calculation alone and sends no request. On error, the operand remains editable.
 
 4. Percentages
-Use one % key in Advanced mode. To calculate 20% of 150, enter 150 → × → 20 → % → = to display 30.
+Use one % key in Advanced mode. Standard hides the key and ignores its keyboard shortcut while preserving any existing percentage marker. To calculate 20% of 150, enter 150 → × → 20 → % → = to display 30.
 
 The % button toggles a visible marker on the entered right operand of a pending add, subtract, multiply, or divide. It sends no request. Editing the operand, applying square root, or switching modes preserves the marker. Erasing the operand, clearing, or successfully evaluating the operation removes it. Evaluating a chain consumes one marker at a time, so 150 + 20% × 10% displays 18:
 Input	Calculation	Result
@@ -44,7 +44,7 @@ Input	Calculation	Result
 
 
 Either sign of zero as the contextual divisor returns 422 with DIVISION_BY_ZERO. Zero is a valid rate for the other operations. Rates may be signed, fractional, or greater than 100. Percentage arithmetic preserves the supplied float64 values, uses exact intermediate calculations, and rounds the final result to float64. This avoids intermediate overflow and underflow. A final non-finite result returns 422 with NON_FINITE_RESULT.
-% leaves the state alone when there is no eligible pending operation or complete right operand. A failed evaluation preserves the marker and keeps the right operand editable.
+With no pending operator, enter a new rate after a completed result, then press % (or type %) to immediately calculate that rate of the last result. For example, 164 + 33 = 197, then 10 % returns 19.7. This uses the existing percentage API operation and full numeric precision. Without a base or complete rate, % leaves the state alone. A failed evaluation preserves the editable operand and any contextual marker.
 
 5. Backend and API
 The Go backend owns the arithmetic and domain validation. React owns keystrokes, calculator interaction state, and rendering. HTTP handlers decode and validate requests, call a calculation service independent of HTTP, and return JSON. The API is stateless.

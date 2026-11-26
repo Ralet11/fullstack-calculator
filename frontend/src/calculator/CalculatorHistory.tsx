@@ -1,7 +1,7 @@
 import { useLayoutEffect, useRef, type RefObject } from 'react'
 import type { CalculationRequest } from './calculatorApi'
 import { formatNumber, formatRequestExpression } from './calculatorPresentation'
-import styles from './CalculatorHistory.module.css'
+import styles from './CalculatorPanels.module.css'
 
 export type HistoryEntry = { id: number; request: CalculationRequest; result: number }
 

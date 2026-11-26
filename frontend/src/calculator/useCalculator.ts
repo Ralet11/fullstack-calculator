@@ -10,6 +10,7 @@ export function useCalculator(onEvaluated: (request: CalculationRequest, result:
   const [state, dispatch] = useReducer(calculatorReducer, initialState)
   const [evaluation, setEvaluation] = useState<Evaluation | null>(null)
   const [showLoading, setShowLoading] = useState(false)
+  const [queuedActions, setQueuedActions] = useState<CalculatorAction[]>([])
   const activeRequest = useRef<AbortController | null>(null)
 
   useEffect(() => {
@@ -44,6 +45,7 @@ export function useCalculator(onEvaluated: (request: CalculationRequest, result:
     } catch (error) {
       if (activeRequest.current === request) {
         const message = error instanceof Error ? error.message : 'The calculation failed. Try again.'
+        setQueuedActions([])
         dispatch({ type: 'requestFailed', message })
       }
     } finally {
@@ -57,17 +59,34 @@ export function useCalculator(onEvaluated: (request: CalculationRequest, result:
   }
 
   function send(action: CalculatorAction) {
-    if (action.type === 'clear') {
+    if (action.type === 'clear' || action.type === 'clearEntry') {
       const request = activeRequest.current
       activeRequest.current = null
       request?.abort()
       setEvaluation(null)
       setShowLoading(false)
-      dispatch({ type: 'clear' })
+      setQueuedActions([])
+      dispatch({ type: action.type })
       return
     }
 
-    if (activeRequest.current || state.loading) return
+    if (activeRequest.current || state.loading || queuedActions.length > 0) {
+      setQueuedActions(actions => action.type === 'equals' && actions.length === 0 ? actions : [...actions, action])
+      return
+    }
+    apply(action)
+  }
+
+  function apply(action: CalculatorAction) {
+    if (action.type === 'clear' || action.type === 'clearEntry') return
+
+    const { entry, pending, result, percentageBase } = state
+    if (action.type === 'togglePercentage' && pending === null) {
+      if (percentageBase !== null && entry !== '' && entry !== '-' && !entry.endsWith('.') && Number.isFinite(Number(entry))) {
+        void calculate({ operation: 'percentage', a: percentageBase, b: Number(entry) })
+      }
+      return
+    }
 
     switch (action.type) {
       case 'digit':
@@ -83,9 +102,6 @@ export function useCalculator(onEvaluated: (request: CalculationRequest, result:
         return
     }
 
-    const { entry, pending, result } = state
-    if (action.type === 'equals' && pending === null) return
-
     const nextOperation = action.type === 'equals' || action.type === 'sqrt' ? null : action.type
     if (entry === '' && result === null) {
       if (pending !== null && nextOperation !== null && nextOperation !== pending.operation) {
@@ -96,6 +112,7 @@ export function useCalculator(onEvaluated: (request: CalculationRequest, result:
 
     const value = result ?? Number(entry)
     if (entry === '-' || entry.endsWith('.') || !Number.isFinite(value)) {
+      setQueuedActions([])
       dispatch({ type: 'requestFailed', message: 'Enter a complete number within the supported range.' })
       return
     }
@@ -111,8 +128,17 @@ export function useCalculator(onEvaluated: (request: CalculationRequest, result:
       }, nextOperation)
     } else if (nextOperation !== null) {
       dispatch({ type: 'setPending', pending: { left: value, operation: nextOperation } })
+    } else if (entry !== '') {
+      setEvaluation(null)
+      dispatch({ type: 'confirmEntry', result: value })
     }
   }
 
-  return { state, send, evaluation, showLoading }
+  useEffect(() => {
+    if (state.loading || activeRequest.current || queuedActions.length === 0) return
+    setQueuedActions(actions => actions.slice(1))
+    apply(queuedActions[0])
+  })
+
+  return { state, send, evaluation, showLoading, equalsUnavailable: state.loading && queuedActions.length === 0 }
 }

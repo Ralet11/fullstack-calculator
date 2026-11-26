@@ -308,7 +308,7 @@ describe('calculator navigation and history', () => {
     await user.keyboard('{Enter}')
     expect(document.activeElement).toBe(modes)
     expect(screen.getByRole('button', { name: 'Modes', description: 'Advanced', expanded: false })).toBe(modes)
-    expect(screen.queryByRole('button', { name: 'Advanced help' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Advanced help', expanded: false })).toBeTruthy()
     expect(value()).toBe('12')
   })
 
@@ -504,21 +504,34 @@ describe('addition calculator', () => {
     expect(screen.queryByRole('button', { name: 'Copy result' })).toBeNull()
   })
 
-  it('keeps the entry and focus when Escape dismisses a key tooltip', async () => {
+  it('opens Advanced help on demand and closes it with Escape before clearing the entry', async () => {
     const { press, user, value } = openCalculator()
     const announcement = screen.getByRole('status', { name: 'Calculation result' })
     await user.keyboard('12')
     expect(announcement.textContent).toBe('')
+    expect(screen.queryByRole('button', { name: 'Advanced help' })).toBeNull()
     await press('Advanced')
-    screen.getByRole('status', { name: 'Calculator display' }).focus()
+    const info = screen.getByRole('button', { name: 'Advanced help', expanded: false })
+    const history = screen.getByRole('button', { name: 'History' })
+    expect(info.closest('header')).toBe(history.closest('header'))
+    info.focus()
     await user.tab()
+    expect(document.activeElement).toBe(history)
     const power = screen.getByRole('button', { name: 'Power', description: /enter an exponent/i })
-    expect(document.activeElement).toBe(power)
-    expect(screen.getByRole('tooltip').textContent).toContain('enter an exponent')
+    await user.hover(power)
+    expect(screen.queryByRole('complementary', { name: 'Advanced help' })).toBeNull()
+
+    info.focus()
+    await user.keyboard('{Enter}')
+    const help = screen.getByRole('complementary', { name: 'Advanced help' })
+    expect(help.id).toBe(info.getAttribute('aria-controls'))
+    expect(help.textContent).toContain('150 × 20% = 30')
+    expect(info.getAttribute('aria-expanded')).toBe('true')
+    expect(document.activeElement).toBe(within(help).getByRole('button', { name: 'Close help' }))
 
     await user.keyboard('{Escape}')
-    expect(screen.queryByRole('tooltip')).toBeNull()
-    expect(document.activeElement).toBe(power)
+    expect(screen.queryByRole('complementary', { name: 'Advanced help' })).toBeNull()
+    expect(document.activeElement).toBe(info)
     expect(value()).toBe('12')
 
     await user.keyboard('{Escape}')
@@ -549,17 +562,17 @@ describe('addition calculator', () => {
     expect(value()).toBe('0')
   })
 
-  it('tabs through the keypad in row order and activates a focused digit', async () => {
+  it('tabs through the Standard keypad in row order and activates a focused digit', async () => {
     const { user, value } = openCalculator()
-    const add = screen.getByRole('button', { name: 'Add' })
+    const clearEntry = screen.getByRole('button', { name: 'Clear entry' })
     const visited = new Set<Element | null>()
-    while (document.activeElement !== add && !visited.has(document.activeElement)) {
+    while (document.activeElement !== clearEntry && !visited.has(document.activeElement)) {
       visited.add(document.activeElement)
       await user.tab()
     }
-    expect(document.activeElement).toBe(add)
+    expect(document.activeElement).toBe(clearEntry)
 
-    for (const name of ['7', '8', '9', 'Subtract', '4']) {
+    for (const name of ['Clear', 'Backspace', '7', '8', '9', 'Divide', '4']) {
       await user.tab()
       expect(document.activeElement).toBe(screen.getByRole('button', { name }))
     }
@@ -577,6 +590,7 @@ describe('addition calculator', () => {
     expect(screen.getByRole('button', { name: 'Equals' }).getAttribute('aria-disabled')).toBe('true')
     await user.keyboard('==')
     expect(fetchMock).toHaveBeenCalledTimes(1)
+    await user.keyboard('91')
 
     await press('Clear')
     expect(fetchMock.mock.calls[0][1]?.signal?.aborted).toBe(true)
@@ -953,8 +967,47 @@ describe('subtraction calculator', () => {
   })
 })
 
-describe('advanced keypad', () => {
-  it('places the symbol-only Advanced keys first in the shared keypad tab order', async () => {
+describe('keypad layout and controls', () => {
+  it('uses Backspace for one digit, CE for the right entry, and C for the whole calculation', async () => {
+    fetchMock.mockResolvedValueOnce(reply(19))
+    const { press, user, value } = openCalculator()
+
+    await press('Advanced')
+    await user.keyboard('12+85')
+    await press('Backspace')
+    expect(value()).toBe('8')
+    await press('Contextual percentage')
+    expect(value()).toBe('8%')
+    await press('Clear entry')
+    expect(value()).toBe('0')
+    expect(screen.getByText('12 + 0')).toBeTruthy()
+    await user.keyboard('7=')
+
+    await waitFor(() => expect(value()).toBe('19'))
+    expect(requestBody()).toEqual({ operation: 'add', a: 12, b: 7 })
+    await press('Clear')
+    expect(value()).toBe('0')
+    expect(screen.queryByRole('group', { name: 'Calculation expression' })).toBeNull()
+  })
+
+  it('lets CE cancel an in-flight request while preserving its pending operator', async () => {
+    const pending = deferredResponse()
+    fetchMock.mockReturnValueOnce(pending.promise).mockResolvedValueOnce(reply(4))
+    const { press, user, value } = openCalculator()
+
+    await user.keyboard('8/4=')
+    await press('Clear entry')
+    expect(fetchMock.mock.calls[0][1]?.signal?.aborted).toBe(true)
+    await act(async () => pending.resolve(reply(2)))
+    expect(value()).toBe('0')
+    expect(screen.getByText('8 ÷ 0')).toBeTruthy()
+
+    await user.keyboard('2=')
+    await waitFor(() => expect(value()).toBe('4'))
+    expect(requestBody(1)).toEqual({ operation: 'divide', a: 8, b: 2 })
+  })
+
+  it('places the Advanced keys in the second row and follows the full visual Tab order', async () => {
     const { press, user } = openCalculator()
     const equals = screen.getByRole('button', { name: 'Equals' })
     const keypad = equals.parentElement!
@@ -968,12 +1021,10 @@ describe('advanced keypad', () => {
     expect(contextual.textContent).toBe('%')
 
     screen.getByRole('status', { name: 'Calculator display' }).focus()
-    for (const name of ['Power', 'Square root', 'Contextual percentage', 'Clear']) {
+    for (const name of ['Clear entry', 'Clear', 'Contextual percentage', 'Backspace', 'Power', 'Square root', 'Divide', '7', '8', '9', 'Multiply', '4', '5', '6', 'Subtract', '1', '2', '3', 'Add', 'Toggle sign', '0', 'Decimal point', 'Equals']) {
       await user.tab()
       expect(document.activeElement).toBe(within(keypad).getByRole('button', { name }))
     }
-    await user.hover(contextual)
-    expect(screen.getByRole('tooltip').textContent).toContain('150 × 20% = 30')
   })
 })
 
@@ -1102,11 +1153,67 @@ describe('advanced square root', () => {
 })
 
 describe('advanced percentages', () => {
+  it('confirms a standalone number and applies a typed rate to that value', async () => {
+    fetchMock.mockResolvedValueOnce(reply(9.9))
+    const { press, user, value } = openCalculator()
+
+    await press('Advanced')
+    await user.keyboard('99=')
+    expect(screen.getByRole('group', { name: 'Calculation expression' }).textContent).toBe('99 =')
+    expect(value()).toBe('99')
+    expect(fetchMock).not.toHaveBeenCalled()
+
+    await user.keyboard('10%')
+    expect(requestBody()).toEqual({ operation: 'percentage', a: 99, b: 10 })
+    await waitFor(() => expect(value()).toBe('9.9'))
+    expect(screen.getByRole('group', { name: 'Calculation expression' }).textContent).toBe('99 × 10% =')
+  })
+
+  it('accepts keypad digits and percentage during a request and uses the result as the base', async () => {
+    const addition = deferredResponse()
+    fetchMock.mockReturnValueOnce(addition.promise).mockResolvedValueOnce(reply(19.7))
+    const { press, user, value } = openCalculator()
+
+    await press('Advanced')
+    await user.keyboard('164+33=')
+    expect(screen.getByRole('button', { name: '1' }).hasAttribute('disabled')).toBe(false)
+    await press('1')
+    await press('0')
+    await press('Contextual percentage')
+    expect(value()).toBe('33')
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+
+    await act(async () => addition.resolve(reply(197)))
+    await waitFor(() => expect(value()).toBe('19.7'))
+    expect(requestBody(1)).toEqual({ operation: 'percentage', a: 197, b: 10 })
+    expect(screen.getByRole('group', { name: 'Calculation expression' }).textContent).toBe('197 × 10% =')
+  })
+
+  it('keeps the failed operands editable even if keys were pressed during the request', async () => {
+    const division = deferredResponse()
+    fetchMock.mockReturnValueOnce(division.promise).mockResolvedValueOnce(reply(4))
+    const { user, value } = openCalculator()
+
+    await user.keyboard('8/0=72')
+    await act(async () => division.resolve(Response.json({
+      error: { code: 'DIVISION_BY_ZERO', message: 'Division by zero is not allowed.' },
+    }, { status: 422 })))
+    expect(value()).toBe('0')
+    expect((await screen.findByRole('alert')).textContent).toContain('Division by zero')
+    await user.keyboard('2=')
+    await waitFor(() => expect(value()).toBe('4'))
+    expect(requestBody(1)).toEqual({ operation: 'divide', a: 8, b: 2 })
+  })
+
   it('finds a percentage of a value through multiplication and starts a new chain from the result', async () => {
     fetchMock.mockResolvedValueOnce(reply(30)).mockResolvedValueOnce(reply(35))
     const { press, user, value } = openCalculator()
 
+    await user.keyboard('50=10%')
+    expect(value()).toBe('10')
+    expect(fetchMock).not.toHaveBeenCalled()
     expect(screen.queryByRole('button', { name: 'Contextual percentage' })).toBeNull()
+    await press('Clear')
     await press('Advanced')
     await user.keyboard('150*')
     await press('Contextual percentage')

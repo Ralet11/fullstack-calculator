@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState, useSyncExternalStore, type MouseEvent } from 'react'
+import { CalculatorAdvancedHelp } from './CalculatorAdvanced'
 import { CalculatorDisplay } from './CalculatorDisplay'
 import { CalculatorHeader, type CalculatorSize } from './CalculatorHeader'
 import { CalculatorHistory, type HistoryEntry } from './CalculatorHistory'
@@ -16,6 +17,7 @@ const keyboardActions: Record<string, CalculatorAction | undefined> = {
   '*': { type: 'multiply' },
   '/': { type: 'divide' },
   '^': { type: 'power' },
+  '%': { type: 'togglePercentage' },
   '.': { type: 'decimal' },
   '=': { type: 'equals' },
   Enter: { type: 'equals' },
@@ -43,18 +45,22 @@ type Props = {
 export function Calculator({ size, onSizeChange }: Props) {
   const [entries, setEntries] = useState<HistoryEntry[]>([])
   const nextEntryId = useRef(0)
-  const { state, send, evaluation, showLoading } = useCalculator(recordEvaluation)
+  const { state, send, evaluation, showLoading, equalsUnavailable } = useCalculator(recordEvaluation)
   const [advanced, setAdvanced] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [historyOpen, setHistoryOpen] = useState(false)
+  const [helpOpen, setHelpOpen] = useState(false)
   const desktop = useSyncExternalStore(subscribeToHistoryLayout, isHistoryDocked)
   const historyDocked = desktop && size !== 'Large'
   const historyId = useId()
+  const helpId = useId()
   const calculator = useRef<HTMLElement>(null)
   const display = useRef<HTMLOutputElement>(null)
   const modesButton = useRef<HTMLButtonElement>(null)
   const historyButton = useRef<HTMLButtonElement>(null)
   const historyDialog = useRef<HTMLDialogElement>(null)
+  const helpButton = useRef<HTMLButtonElement>(null)
+  const helpDialog = useRef<HTMLDialogElement>(null)
 
   function recordEvaluation(request: CalculationRequest, result: number) {
     const entry = { id: nextEntryId.current++, request, result }
@@ -67,11 +73,20 @@ export function Calculator({ size, onSizeChange }: Props) {
     historyButton.current?.focus({ preventScroll: true })
   }
 
+  function closeHelp(restoreFocus = true) {
+    if (helpDialog.current?.open) helpDialog.current.close()
+    setHelpOpen(false)
+    if (restoreFocus) helpButton.current?.focus({ preventScroll: true })
+  }
+
   useEffect(() => {
     function dismissNavigation(event: KeyboardEvent) {
       if (event.defaultPrevented || event.key !== 'Escape' || event.repeat || event.isComposing) return
       const target = event.target instanceof Element ? event.target : null
-      if (historyOpen && (!historyDocked || target === historyButton.current || target?.closest('[data-calculator-history]'))) {
+      if (helpOpen && !menuOpen) {
+        event.preventDefault()
+        closeHelp()
+      } else if (historyOpen && (!historyDocked || target === historyButton.current || target?.closest('[data-calculator-history]'))) {
         event.preventDefault()
         closeHistory()
       } else if (menuOpen) {
@@ -84,21 +99,21 @@ export function Calculator({ size, onSizeChange }: Props) {
     function handleKey(event: KeyboardEvent) {
       if (event.defaultPrevented || event.ctrlKey || event.metaKey || event.altKey || event.isComposing) return
       const target = event.target instanceof Element ? event.target : null
-      if (menuOpen || (historyOpen && !historyDocked) || target?.closest('[data-calculator-history]')) return
+      if (menuOpen || ((historyOpen || helpOpen) && !historyDocked) || target?.closest('[data-calculator-history], [data-calculator-help]')) return
       if (event.key === 'Escape' && event.repeat) return
       if (event.key === 'Enter' && target instanceof HTMLButtonElement) return
 
       const action = /^[0-9]$/.test(event.key)
         ? { type: 'digit' as const, digit: event.key }
         : keyboardActions[event.key]
-      if (!action || (action.type === 'power' && !advanced)) return
+      if (!action || (!advanced && (action.type === 'power' || action.type === 'togglePercentage'))) return
 
       event.preventDefault()
       send(action)
     }
 
     function isCalculatorClipboardEvent(event: ClipboardEvent) {
-      if (event.defaultPrevented || menuOpen || (historyOpen && !historyDocked)) return false
+      if (event.defaultPrevented || menuOpen || ((historyOpen || helpOpen) && !historyDocked)) return false
       const target = event.target instanceof Element ? event.target : document.activeElement
       if (target instanceof HTMLElement && (target.isContentEditable || target.closest('input, textarea, select'))) return false
       return target === document.body || (target !== null && calculator.current?.contains(target))
@@ -144,7 +159,7 @@ export function Calculator({ size, onSizeChange }: Props) {
       window.removeEventListener('copy', handleCopy)
       window.removeEventListener('paste', handlePaste)
     }
-  }, [advanced, historyDocked, historyOpen, menuOpen, send, state])
+  }, [advanced, helpOpen, historyDocked, historyOpen, menuOpen, send, state])
 
   function focusDisplayAfterPointerClick(event: MouseEvent<HTMLElement>) {
     if (event.detail === 0 || !(event.target instanceof Element)) return
@@ -163,6 +178,10 @@ export function Calculator({ size, onSizeChange }: Props) {
   const right = attemptedRoot || state.entry || (state.result === null ? '' : formatNumber(state.result))
 
   let expression = attemptedRoot
+  if (evaluation?.result === null && evaluation.request.operation === 'percentage' && (state.loading || state.error !== null)) {
+    expression = formatRequestExpression(evaluation.request)
+  }
+  if (state.confirmedEntry !== null) expression = state.confirmedEntry + ' ='
   if (state.pending) {
     const { operation, left, percentage } = state.pending
     expression = formatPendingExpression(operation, left, right, percentage)
@@ -181,14 +200,22 @@ export function Calculator({ size, onSizeChange }: Props) {
           menuOpen={menuOpen}
           historyOpen={historyOpen}
           historyId={historyId}
+          helpId={helpId}
+          helpOpen={helpOpen}
+          helpButton={helpButton}
+          onHelpToggle={() => {
+            if (helpOpen) closeHelp()
+            else { setMenuOpen(false); setHistoryOpen(false); setHelpOpen(true) }
+          }}
           modesButton={modesButton}
           historyButton={historyButton}
           onMenuOpenChange={setMenuOpen}
-          onModeChange={setAdvanced}
+          onModeChange={next => { if (!next) closeHelp(false); setAdvanced(next) }}
           onHistoryToggle={() => {
             if (historyOpen) closeHistory()
             else {
               setMenuOpen(false)
+              closeHelp(false)
               setHistoryOpen(true)
             }
           }}
@@ -204,12 +231,18 @@ export function Calculator({ size, onSizeChange }: Props) {
           showLoading={showLoading}
           error={state.error}
         />
-        <CalculatorKeypad advanced={advanced} loading={state.loading} percentageMarked={percentageMarked} onAction={send} />
+        <CalculatorKeypad
+          advanced={advanced}
+          equalsUnavailable={equalsUnavailable}
+          percentageMarked={percentageMarked}
+          helpId={helpId}
+          onAction={send}
+        />
         <p className={styles.hint}>
-          <span className={advanced ? styles.advancedKeyboardHint : undefined}><kbd>Enter</kbd> calculate · <kbd>Esc</kbd> clear</span>
-          {advanced && <span className={styles.touchHint}>Hold an Advanced key for help</span>}
+          <kbd>Enter</kbd> calculate · <kbd>Esc</kbd> clear
         </p>
       </section>
+      {advanced && <CalculatorAdvancedHelp id={helpId} open={helpOpen} docked={historyDocked} dialog={helpDialog} onClose={() => closeHelp()} />}
       <CalculatorHistory
         id={historyId}
         entries={entries}

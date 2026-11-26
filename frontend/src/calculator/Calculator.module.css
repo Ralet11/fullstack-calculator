@@ -49,20 +49,6 @@
   text-align: center;
 }
 
-.touchHint {
-  display: none;
-}
-
-@media (pointer: coarse) {
-  .advancedKeyboardHint {
-    display: none;
-  }
-
-  .touchHint {
-    display: inline;
-  }
-}
-
 .hint kbd {
   font: inherit;
   font-weight: var(--weight-semibold);

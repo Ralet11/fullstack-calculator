@@ -6,6 +6,7 @@
 }
 
 .keypad > button,
+.entryControls > button,
 .keypad .advancedKey {
   --control-surface: var(--digit);
   --control-hover: var(--digit-hover);
@@ -27,14 +28,7 @@
   touch-action: manipulation;
 }
 
-.keypad > button:disabled,
-.keypad .advancedKey:disabled {
-  cursor: default;
-}
-
 .keypad .equals[aria-disabled="true"] {
-  --control-surface: color-mix(in srgb, var(--primary) 60%, var(--surface));
-  --control-ink: var(--ink);
   cursor: default;
 }
 
@@ -100,18 +94,61 @@
   font-size: clamp(1.75rem, 5.8vmin, 4.25rem);
 }
 
-.zero {
-  grid-column: span 2;
+.keypad .clearEntry {
+  --control-surface: #e8f2e9;
+  --control-hover: #dcecdf;
+  --control-active: #ccdccc;
+  --control-edge: #cbded0;
+  --control-ink: #285c3e;
+}
+
+.keypad .backspace {
+  --control-surface: #f6eaea;
+  --control-hover: #f1dddd;
+  --control-active: #eacfcf;
+  --control-edge: #e8d1d1;
+  --control-ink: #884446;
+}
+
+.entryControls {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--calculator-key-gap);
+}
+
+.standardEntryControls {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.advancedOperations {
+  display: grid;
+  grid-column: span 3;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--calculator-key-gap);
+}
+
+.backspace svg {
+  display: block;
+  width: 1.15em;
+  height: 1.15em;
+  margin-inline: auto;
+}
+
+.wideEquals {
+  grid-column: 1 / -1;
 }
 
 @media (hover: hover) {
   .keypad > button:enabled:not([aria-disabled="true"]):hover,
+  .entryControls > button:hover,
   .keypad .advancedKey:enabled:hover {
     background: var(--control-hover);
   }
 }
 
 .keypad > button:enabled:not([aria-disabled="true"]):active,
+.entryControls > button:active,
 .keypad .advancedKey:enabled:active {
   background: var(--control-active);
   box-shadow: none;

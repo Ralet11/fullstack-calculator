@@ -90,7 +90,7 @@ npx playwright-core install --only-shell chromium
 npm run test:smoke
 ```
 
-The script drives Chromium through the running React app and checks the real Go responses for `1 ÷ 3 × 3 = 1`, correction of `8 ÷ 0` to `8 ÷ 2 = 4`, correction of `150 ÷ 0%` to `150 ÷ 20% = 750` with mode switches, and `150 × 20% = 30`. It also checks history, tooltips, and that Equals retains keyboard focus and sends only one request when activated repeatedly during a delayed Go response. It uses `http://127.0.0.1:5173` by default. If Vite uses another port, pass its URL with `npm run test:smoke -- http://127.0.0.1:5174`. On Linux, `npx playwright-core install --with-deps --only-shell chromium` also installs the browser's system dependencies.
+The script drives Chromium through the running React app and checks the real Go responses for `1 ÷ 3 × 3 = 1`, correction of `8 ÷ 0` to `8 ÷ 2 = 4`, correction of `150 ÷ 0%` to `150 ÷ 20% = 750` with mode switches, and `150 × 20% = 30`. It also checks history, the Advanced help disclosure, and that Equals retains keyboard focus and sends only one request when activated repeatedly during a delayed Go response. It uses `http://127.0.0.1:5173` by default. If Vite uses another port, pass its URL with `npm run test:smoke -- http://127.0.0.1:5174`. On Linux, `npx playwright-core install --with-deps --only-shell chromium` also installs the browser's system dependencies.
 
 ## Design
 

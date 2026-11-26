@@ -12,6 +12,7 @@
 
 .modes,
 .history,
+.info,
 .options button {
   min-height: var(--control-min);
   border: 1px solid transparent;
@@ -25,7 +26,8 @@
 }
 
 .modes,
-.history {
+.history,
+.info {
   display: flex;
   align-items: center;
   gap: var(--space-2);
@@ -37,12 +39,31 @@
   font-size: clamp(var(--text-sm), 2.15vmin, 1.25rem);
 }
 
-.history {
+.history,
+.info {
   color: var(--muted);
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.info {
+  justify-content: center;
+  min-width: var(--control-min);
+}
+
+.info svg {
+  display: block;
+  width: 1.125rem;
+  height: 1.125rem;
 }
 
 .modes[aria-expanded="true"],
 .history[aria-expanded="true"],
+.info[aria-expanded="true"],
 .options button[aria-pressed="true"] {
   background: var(--operator);
   color: var(--operator-ink);
@@ -51,6 +72,7 @@
 @media (hover: hover) {
   .modes[aria-expanded="false"]:hover,
   .history[aria-expanded="false"]:hover,
+  .info[aria-expanded="false"]:hover,
   .options button[aria-pressed="false"]:hover {
     background: var(--utility-hover);
   }
@@ -58,6 +80,7 @@
 
 .modes:active,
 .history:active,
+.info:active,
 .options button:active {
   border-color: var(--operator-edge);
 }
