@@ -2,6 +2,14 @@
 
 A React and TypeScript calculator with a Go JSON API. It supports addition, subtraction, multiplication, and division with negative and decimal operands. Mixed chains evaluate from left to right. Advanced mode adds square root, power, and a contextual `%` key.
 
+[Live demo](https://calculator.prismadevs.com)
+
+## Using the calculator
+
+- **CE** resets the current entry to zero and keeps the pending operator and first operand. **C** clears the whole calculation. **⌫** removes one character from the current entry.
+- In **Advanced**, press **%** after entering the right operand to mark it as a rate. To calculate a percentage of the last result, enter the rate and press **%**. For example, `164 + 33 = 197`, then `10 %` gives `19.7`.
+- Errors appear below the display without moving the keypad. Correct the current entry and try again.
+
 ## Run locally
 
 Install Node.js (20.19+ within the 20.x line, or 22.12+) and Go 1.27.4 or later.
@@ -56,7 +64,7 @@ The response is HTTP 200 with `{"result":40}`. Send one JSON object containing a
 
 Invalid requests, including duplicate or unknown fields, return HTTP 400 with `INVALID_REQUEST`. Calculation errors return HTTP 422. Division by either sign of zero returns `{"error":{"code":"DIVISION_BY_ZERO","message":"Division by zero is not allowed."}}`. Overflow uses `NON_FINITE_RESULT`. A negative base with a fractional exponent or zero with a negative exponent uses `INVALID_POWER`. A negative square root operand uses `INVALID_SQRT`. For example, `{"operation":"power","a":2,"b":3}` returns `{"result":8}` and `{"operation":"sqrt","a":81}` returns `{"result":9}`.
 
-For 20% of 150, enter `150 × 20`, press **%**, and evaluate. The API receives `{"operation":"multiply","a":150,"b":20,"percentage":true}` and returns `{"result":30}`. API clients can also send `{"operation":"percentage","a":150,"b":20}` for the same result. For `150 + 20%`, press **%** after entering `20`. Evaluation sends `{"operation":"add","a":150,"b":20,"percentage":true}` and returns `{"result":180}`.
+In Advanced mode, for 20% of 150, enter `150 × 20`, press **%**, and evaluate. The API receives `{"operation":"multiply","a":150,"b":20,"percentage":true}` and returns `{"result":30}`. API clients can also send `{"operation":"percentage","a":150,"b":20}` for the same result. For `150 + 20%`, press **%** after entering `20`. Evaluation sends `{"operation":"add","a":150,"b":20,"percentage":true}` and returns `{"result":180}`.
 
 ## Tests and coverage
 
@@ -79,7 +87,7 @@ go build -o calculator-api .
 
 On pull requests and pushes to `main`, GitHub Actions runs both sets of checks in separate Ubuntu jobs. The frontend uses Node 24 and the backend uses Go 1.27.4 from `backend/go.mod`. Run the browser smoke test separately with both services running. [CI workflow](.github/workflows/backend.yml)
 
-The local assessment run passed 57 React tests with 91.71% line and 85.81% branch coverage. The Go suite reported 90.8% statement coverage. All seven live Chromium smoke scenarios passed. See the [assessment verification report](docs/VERIFICATION.md) for toolchain details and browser results.
+For the published revision `b35c471`, 62 React tests passed with 92.93% line and 87.01% branch coverage. The Go suite and `go vet` passed, with 90.8% Go statement coverage. All eight Chromium smoke scenarios passed against the public HTTPS deployment. The [assessment verification report](docs/VERIFICATION.md) records the original assessment run.
 
 ## Browser smoke test
 
@@ -90,11 +98,11 @@ npx playwright-core install --only-shell chromium
 npm run test:smoke
 ```
 
-The script drives Chromium through the running React app and checks the real Go responses for `1 ÷ 3 × 3 = 1`, correction of `8 ÷ 0` to `8 ÷ 2 = 4`, correction of `150 ÷ 0%` to `150 ÷ 20% = 750` with mode switches, and `150 × 20% = 30`. It also checks history, the Advanced help disclosure, and that Equals retains keyboard focus and sends only one request when activated repeatedly during a delayed Go response. It uses `http://127.0.0.1:5173` by default. If Vite uses another port, pass its URL with `npm run test:smoke -- http://127.0.0.1:5174`. On Linux, `npx playwright-core install --with-deps --only-shell chromium` also installs the browser's system dependencies.
+Chromium exercises the running React app and Go API. The scenarios cover full-precision chaining, direct and contextual percentages, recovery from division by zero, and an error alert that leaves the display and keypad in place. The script also checks the mobile history drawer, Advanced help, and keyboard focus with duplicate-request protection while Equals is pending. It uses `http://127.0.0.1:5173` by default. If Vite uses another port, pass its URL with `npm run test:smoke -- http://127.0.0.1:5174`. On Linux, `npx playwright-core install --with-deps --only-shell chromium` also installs the browser's system dependencies.
 
 ## Design
 
-- React owns the calculator interaction. A pure reducer manages input and transitions. The hook issues requests through native `fetch`; Clear aborts the request and invalidates any response that still arrives.
+- React owns the calculator interaction. A pure reducer manages input and transitions. The hook sends requests through native `fetch`. Keys entered while a request is pending are applied in order after it succeeds. CE and C cancel the active request and discard stale responses.
 - The Go HTTP handler validates JSON before calling the arithmetic function. Go uses float64, so decimal arithmetic can round. The display shows up to 12 significant digits, while chaining uses the full returned number.
 - Additional operations can extend the calculation package and keypad interaction while retaining the separation between UI, state, transport, and arithmetic.
 
