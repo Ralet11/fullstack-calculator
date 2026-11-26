@@ -4,7 +4,7 @@ A React and TypeScript calculator with a Go JSON API. It supports addition, subt
 
 ## Run locally
 
-Install Node.js (20.19+ within the 20.x line, or 22.12+) and Go 1.25 or later.
+Install Node.js (20.19+ within the 20.x line, or 22.12+) and Go 1.27.4 or later.
 
 Start the API in one terminal.
 
@@ -21,7 +21,19 @@ npm ci
 npm run dev
 ```
 
-Vite proxies `/api` to the Go server at `http://127.0.0.1:8080`. A deployment of the frontend build should route `/api` to Go on the same origin.
+Vite proxies `/api` to the Go server at `http://127.0.0.1:8080`. The API uses that listen address by default. Set `CALCULATOR_ADDR` to override the address and port when running Go directly.
+
+## Run with Docker
+
+Start Docker Engine or Docker Desktop in Linux container mode. From the repository root:
+
+```sh
+docker compose up --build
+```
+
+Open the calculator at `http://127.0.0.1:8088`. Nginx serves the React build and forwards `/api/` to Go on the Compose network. The API is available on the same origin, including `POST http://127.0.0.1:8088/api/calculate`. Only Nginx publishes a host port.
+
+Use `docker compose ps` to check readiness and `docker compose down` to stop the stack. To run the browser smoke test against Compose, install the test dependencies and Chromium as described below, then run `npm run test:smoke -- http://127.0.0.1:8088` from `frontend/`.
 
 ## API
 
@@ -65,9 +77,9 @@ go vet ./...
 go build -o calculator-api .
 ```
 
-On pull requests and pushes to `main`, GitHub Actions runs both sets of checks in separate Ubuntu jobs. The frontend uses Node 24 and the backend uses the version in `backend/go.mod`. Run the browser smoke test separately with both services running. [CI workflow](.github/workflows/backend.yml)
+On pull requests and pushes to `main`, GitHub Actions runs both sets of checks in separate Ubuntu jobs. The frontend uses Node 24 and the backend uses Go 1.27.4 from `backend/go.mod`. Run the browser smoke test separately with both services running. [CI workflow](.github/workflows/backend.yml)
 
-The local assessment run passed 56 React tests with 91.78% line and 85.54% branch coverage. The Go suite reported 92.8% statement coverage. See the [assessment verification report](docs/VERIFICATION.md) for toolchain details and browser results.
+The local assessment run passed 57 React tests with 91.71% line and 85.81% branch coverage. The Go suite reported 90.8% statement coverage. All seven live Chromium smoke scenarios passed. See the [assessment verification report](docs/VERIFICATION.md) for toolchain details and browser results.
 
 ## Browser smoke test
 
@@ -78,7 +90,7 @@ npx playwright-core install --only-shell chromium
 npm run test:smoke
 ```
 
-The script drives Chromium through the running React app and checks the real Go responses for `1 ÷ 3 × 3 = 1`, correction of `8 ÷ 0` to `8 ÷ 2 = 4`, correction of `150 ÷ 0%` to `150 ÷ 20% = 750` with mode switches, and `150 × 20% = 30`. It uses `http://127.0.0.1:5173` by default. If Vite uses another port, pass its URL with `npm run test:smoke -- http://127.0.0.1:5174`. On Linux, `npx playwright-core install --with-deps --only-shell chromium` also installs the browser's system dependencies.
+The script drives Chromium through the running React app and checks the real Go responses for `1 ÷ 3 × 3 = 1`, correction of `8 ÷ 0` to `8 ÷ 2 = 4`, correction of `150 ÷ 0%` to `150 ÷ 20% = 750` with mode switches, and `150 × 20% = 30`. It also checks history, tooltips, and that Equals retains keyboard focus and sends only one request when activated repeatedly during a delayed Go response. It uses `http://127.0.0.1:5173` by default. If Vite uses another port, pass its URL with `npm run test:smoke -- http://127.0.0.1:5174`. On Linux, `npx playwright-core install --with-deps --only-shell chromium` also installs the browser's system dependencies.
 
 ## Design
 

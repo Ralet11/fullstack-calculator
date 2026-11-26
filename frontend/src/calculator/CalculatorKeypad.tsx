@@ -38,7 +38,21 @@ export function CalculatorKeypad({ advanced, loading, percentageMarked, onAction
       ))}
       <button type="button" className={styles.zero} disabled={loading} onClick={() => onAction({ type: 'digit', digit: '0' })}>0</button>
       <button type="button" disabled={loading} onClick={() => onAction({ type: 'decimal' })} aria-label="Decimal point">.</button>
-      <button type="button" className={styles.equals} disabled={loading} onClick={() => onAction({ type: 'equals' })} aria-label="Equals">=</button>
+      <button
+        type="button"
+        className={styles.equals}
+        aria-disabled={loading}
+        aria-label="Equals"
+        onClick={event => {
+          if (loading) {
+            event.stopPropagation()
+            return
+          }
+          onAction({ type: 'equals' })
+        }}
+      >
+        =
+      </button>
     </div>
   )
 }

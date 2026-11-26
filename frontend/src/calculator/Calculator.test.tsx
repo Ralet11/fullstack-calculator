@@ -574,7 +574,7 @@ describe('addition calculator', () => {
     const { press, user, value } = openCalculator()
 
     await user.keyboard('2+3=')
-    expect((screen.getByRole('button', { name: 'Equals' }) as HTMLButtonElement).disabled).toBe(true)
+    expect(screen.getByRole('button', { name: 'Equals' }).getAttribute('aria-disabled')).toBe('true')
     await user.keyboard('==')
     expect(fetchMock).toHaveBeenCalledTimes(1)
 
@@ -584,7 +584,7 @@ describe('addition calculator', () => {
     await user.keyboard('7+8=')
     await act(async () => stale.resolve(reply(5)))
     expect(value()).toBe('8')
-    expect((screen.getByRole('button', { name: 'Equals' }) as HTMLButtonElement).disabled).toBe(true)
+    expect(screen.getByRole('button', { name: 'Equals' }).getAttribute('aria-disabled')).toBe('true')
 
     await act(async () => current.resolve(reply(15)))
     expect(value()).toBe('15')
@@ -612,7 +612,7 @@ describe('addition calculator', () => {
       await act(async () => response.resolve(reply(5)))
       expect(screen.queryByText('Calculating…')).toBeNull()
       expect(value()).toBe('5')
-      expect((screen.getByRole('button', { name: 'Equals' }) as HTMLButtonElement).disabled).toBe(false)
+      expect(screen.getByRole('button', { name: 'Equals' }).getAttribute('aria-disabled')).toBe('false')
     } finally {
       vi.useRealTimers()
     }
@@ -938,7 +938,7 @@ describe('subtraction calculator', () => {
     const { press, user, value } = openCalculator()
 
     await user.keyboard('5-10+')
-    expect((screen.getByRole('button', { name: 'Equals' }) as HTMLButtonElement).disabled).toBe(true)
+    expect(screen.getByRole('button', { name: 'Equals' }).getAttribute('aria-disabled')).toBe('true')
     expect(requestBody()).toEqual({ operation: 'subtract', a: 5, b: 10 })
 
     await press('Clear')
@@ -1015,10 +1015,10 @@ describe('advanced power', () => {
 
     await user.keyboard('=')
     expect(requestBody()).toEqual({ operation: 'power', a: 2, b: 3 })
-    expect((screen.getByRole('button', { name: 'Equals' }) as HTMLButtonElement).disabled).toBe(true)
+    expect(screen.getByRole('button', { name: 'Equals' }).getAttribute('aria-disabled')).toBe('true')
     await press('Advanced')
     expect(screen.getByRole('button', { name: 'Modes', description: 'Advanced' })).toBeTruthy()
-    expect((screen.getByRole('button', { name: 'Equals' }) as HTMLButtonElement).disabled).toBe(true)
+    expect(screen.getByRole('button', { name: 'Equals' }).getAttribute('aria-disabled')).toBe('true')
     expect(fetchMock).toHaveBeenCalledTimes(1)
     expect(fetchMock.mock.calls[0][1]?.signal?.aborted).toBe(false)
 
@@ -1063,7 +1063,7 @@ describe('advanced square root', () => {
     expect(requestBody()).toEqual({ operation: 'sqrt', a: 2 })
     await press('Standard')
     expect(screen.queryByRole('button', { name: 'Square root' })).toBeNull()
-    expect((screen.getByRole('button', { name: 'Equals' }) as HTMLButtonElement).disabled).toBe(true)
+    expect(screen.getByRole('button', { name: 'Equals' }).getAttribute('aria-disabled')).toBe('true')
 
     await act(async () => response.resolve(reply(root)))
     expect(screen.getByText('2 + 1.41421356237')).toBeTruthy()

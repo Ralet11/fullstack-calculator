@@ -32,6 +32,12 @@
   cursor: default;
 }
 
+.keypad .equals[aria-disabled="true"] {
+  --control-surface: color-mix(in srgb, var(--primary) 60%, var(--surface));
+  --control-ink: var(--ink);
+  cursor: default;
+}
+
 .keypad .utility {
   --control-surface: var(--utility);
   --control-hover: var(--utility-hover);
@@ -99,13 +105,13 @@
 }
 
 @media (hover: hover) {
-  .keypad > button:enabled:hover,
+  .keypad > button:enabled:not([aria-disabled="true"]):hover,
   .keypad .advancedKey:enabled:hover {
     background: var(--control-hover);
   }
 }
 
-.keypad > button:enabled:active,
+.keypad > button:enabled:not([aria-disabled="true"]):active,
 .keypad .advancedKey:enabled:active {
   background: var(--control-active);
   box-shadow: none;

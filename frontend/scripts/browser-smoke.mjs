@@ -143,6 +143,45 @@ try {
   await page.getByRole('tooltip').waitFor({ state: 'hidden' })
   await expectDisplay('1')
   console.log('PASS Advanced tooltip leaves number keys clickable and Escape preserves the input')
+
+  await button('Clear').click()
+  for (const name of ['8', 'Divide', '2']) await button(name).click()
+  const equals = button('Equals')
+  const focusedEquals = equals.and(page.locator(':focus-visible'))
+  let releaseResponse
+  const responseGate = new Promise(resolve => { releaseResponse = resolve })
+  let submissions = 0
+  const delayResponse = async route => {
+    submissions++
+    const response = await route.fetch()
+    await responseGate
+    await route.fulfill({ response })
+  }
+  await page.route(apiURL, delayResponse)
+  try {
+    await button('Decimal point').focus()
+    await page.keyboard.press('Tab')
+    await focusedEquals.waitFor()
+    await page.keyboard.press('Space')
+    await focusedEquals.and(page.locator('[aria-disabled="true"]')).waitFor()
+    await page.keyboard.press('Enter')
+    await page.keyboard.press('Space')
+    await page.keyboard.press('=')
+    await focusedEquals.and(page.locator('[aria-disabled="true"]')).waitFor()
+
+    const received = page.waitForResponse(reply => reply.url() === apiURL && reply.request().method() === 'POST')
+    releaseResponse()
+    const response = await received
+    assert.deepEqual(response.request().postDataJSON(), { operation: 'divide', a: 8, b: 2 })
+    assert.equal(response.status(), 200)
+    await expectDisplay('4')
+    await focusedEquals.and(page.locator('[aria-disabled="false"]')).waitFor()
+    assert.equal(submissions, 1)
+    console.log('PASS Equals retains keyboard focus during the real API request and blocks repeated activation')
+  } finally {
+    releaseResponse()
+    await page.unroute(apiURL, delayResponse)
+  }
 } finally {
   await browser.close()
 }

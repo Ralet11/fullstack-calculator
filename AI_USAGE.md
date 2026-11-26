@@ -1412,3 +1412,95 @@ Tool — Codex (ChatGPT). Purpose — reduce unused display space and improve La
 - Shortened the Large readout beside the keypad and kept the expression close to the value. Large adapts the value font by character count and available width and height. Long typed entries still scroll inside the readout. Adjusted Large-only key gaps, utility and Advanced labels, and Equals emphasis. Short landscape uses tighter spacing while keeping 44 px minimum targets. Updated UI_SPEC.md.
 - `npm.cmd run coverage` passed all 57 tests with 92.20% line and 85.98% branch coverage. `npm.cmd run build` and `npm.cmd run test:smoke` passed after correcting a CSS selector caught by the initial build. No calculation or API changes.
 - Chromium verified Advanced mode across nine viewport sizes from 320×568 to 1920×1080, including 672×375, 1024×420, and 1280×500. Checked no horizontal overflow, all keypad keys visible at 1024×420, in-bounds percentage tooltips, one-line scientific output, and 50-digit entry scrolling. At 1440×900, the five-digit result used 151 px type and a scientific result used 42 px. Inspected mobile, short-desktop, and desktop screenshots and verified Compact and Default kept their desktop geometry and typography.
+
+## 2026-11-25 — Final technical review
+
+Tool — Codex (ChatGPT). Purpose — review the published calculator revision against the assessment, functional specification, and UI specification.
+
+### Prompt
+
+> Perform a final technical review before submission
+> Compare the current implementation against ASSESSMENT.md, SPEC.md and UI_SPEC.md
+> Review code quality, architecture, security, input validation, error handling, accessibility and responsive behavior
+> Check for unused code, unnecessary dependencies, duplicated logic and any important regressions
+> Verify that the frontend and backend tests cover the critical functionality
+> Prioritize findings by severity and identify actual blockers, avoid suggesting unnecessary features or refactoring
+
+### Outcome and checks
+
+- Reviewed published main commit `d35ac60` and confirmed it matches the local revision. The repository is private, so evaluator access remains a submission prerequisite. The current hosted push run was not independently verified.
+- Go CI resolves Go 1.25.0 from go.mod. `govulncheck` reported 29 standard-library advisories at symbol level for that toolchain. Those results overapproximate applicability to the loopback-only application. The same scanner found zero vulnerabilities on Go 1.27.4. Recommended switching the submission build to a supported patched toolchain. The npm audit reported zero advisories.
+- Reproduced loss of keyboard focus when Space activates Equals and its button becomes disabled during the API request. Focus stayed on the document body after the accepted result. Verified in Chromium using a delayed real Go response. Large also rebalances its rows between Standard and Advanced, while the UI acceptance wording promises unchanged row sizing. README and VERIFICATION.md still cite the earlier 56-test run.
+- `npm.cmd run coverage` passed all 57 tests with 92.20% line and 85.98% branch coverage. TypeScript with unused declarations enabled, production build, and all six live smoke scenarios passed. Native Go 1.27.4 passed both test packages with 92.8% statement coverage, vet, and build. The workflow passed actionlint. Chromium verified responsive layout, 44 px minimum key heights, and history focus and dismissal at 320×568 through 1440×900. The largest finite float64 also rendered correctly through the live API. Screen-reader output was not tested.
+- No application, dependency, or workflow changes were made during the review.
+
+## 2026-11-25 — Submission audit fixes
+
+Tool — Codex (ChatGPT). Purpose — update the backend toolchain, preserve Equals focus, and refresh submission verification.
+
+### Prompt
+
+> Address the final audit findings before submission
+> Update the Go toolchain to 1.27.4 and align the module, CI configuration and documentation
+> Fix the keyboard focus issue when Equals triggers an API request, keep focus stable without allowing duplicate submissions
+> Add a focused regression test for that behavior
+> Update README.md, UI_SPEC.md and VERIFICATION.md to match the current implementation and test results
+> Keep the existing architecture and calculation logic unchanged, avoid unnecesary refactoring
+> Run the relevant tests, coverage, builds and browser smoke checks
+
+### Outcome and checks
+
+- Updated `backend/go.mod` to Go 1.27.4. CI already reads its version from that file. `actionlint` passed, and `govulncheck` returned zero findings on Go 1.27.4.
+- Equals stays keyboard-focusable while its pending state is announced through `aria-disabled`. Repeat activation is rejected by the button and the existing request guard. The pending appearance keeps the focus outline visible. Added a Chromium regression that tabs to Equals, holds a real Go response, repeats keyboard activation, and verifies one POST and retained focus after completion.
+- Clean `npm.cmd ci`, `npm.cmd run coverage`, and `npm.cmd run build` passed on Windows with Node 24.22.2. The suite passed 57 tests with 91.71% line and 85.81% branch coverage. All seven `npm.cmd run test:smoke` scenarios passed.
+- With Go 1.27.4 on native Windows, module-wide tests and coverage, vet, and API build passed. Statement coverage was 92.8%. Updated README.md, UI_SPEC.md, and VERIFICATION.md. The audit changes have yet to run on GitHub-hosted Ubuntu.
+
+## 2026-11-25 — Docker support review
+
+Tool — Codex (ChatGPT). Purpose — review a two-service Docker Compose deployment before adding container files.
+
+### Prompt
+
+> Review adding Docker support before submission
+>
+> I want a simple production-like setup using multi stage builds for Go and React, Nginx for the frontend and Docker Compose for both services
+>
+> Keep the API accessible through /api on the same origin, without changing application code or adding unnecessary dependencies
+>
+> Review the Dockerfile structure, networking, port configuration, health checks and .dockerignore files
+>
+> The goal is to run the complete app with docker compose up --build from a fresh clone
+>
+> Check if this approach fits the current architecture and suggest any improvements before implementation
+
+### Outcome and checks
+
+- React already calls `/api/calculate` relatively. Go binds to `127.0.0.1:8080`, so a normal bridge-network service hostname cannot reach the API. Recommended letting the API join the Nginx service network namespace via `network_mode: service:frontend`, publishing only Nginx on host port 8088, and forwarding `/api/` to shared loopback without rewriting the path. This preserves application code and couples the two services' network lifecycle. [Docker networking](https://docs.docker.com/engine/network/#container-networks) · [Nginx proxy behavior](https://nginx.org/en/docs/http/ngx_http_proxy_module.html#proxy_pass)
+- Recommended separate build contexts, a Go 1.27.4 builder with a small non-root runtime, and a Node 24 builder using `npm ci` and `npm run build` with an unprivileged Nginx static runtime. Each context gets its own .dockerignore. Exclude generated output and local files while keeping the lockfile and build inputs.
+- Use a frontend GET readiness probe and a backend POST readiness probe against the existing calculate route. Verify a clean Compose build by checking the UI and running the real browser smoke suite against port 8088. Docker Compose v5.7.0 was present, but the CLI could not connect to the Docker engine. No images were built and no deployment or application files were changed.
+
+## 2026-11-25 — Docker Compose implementation
+
+Tool — Codex (ChatGPT). Purpose — package the Go API and production React build with standard Compose service networking.
+
+### Prompt
+
+> Implement Docker Compose using standard service networking
+>
+> Make the Go listen address configurable, keep localhost as default and use 0.0.0.0 inside Docker
+>
+> Use multi stage builds for Go and React, serve the frontend with Nginx and proxy /api to backend:8080
+>
+> Expose only the frontend port, keep the backend internal
+>
+> Add Dockerfiles, compose.yaml, Nginx config and .dockerignore files
+>
+> Keep the setup simple without changing calculation logic
+>
+> Validate Compose and test the full stack if Docker Engine is available
+
+### Outcome and checks
+
+- Added separate multi-stage Go and React images, scoped .dockerignore files, an Nginx configuration, and compose.yaml. Go reads `CALCULATOR_ADDR`, defaulting to `127.0.0.1:8080`. Compose sets `0.0.0.0:8080` on the backend and publishes only Nginx at `127.0.0.1:8088`. Nginx preserves the API path and proxies to `backend:8080` over the default Compose network. Calculation logic was unchanged.
+- Started the installed Docker Desktop Linux engine. `docker compose config --quiet` and `docker compose up --build -d --wait` passed with a temporary project. Both services were healthy, inspection confirmed the backend port was unpublished, and a same-origin POST returned 40 for 25 + 15. All seven `npm.cmd run test:smoke -- http://127.0.0.1:8088` scenarios passed. Stopped and removed the temporary verification containers and network.
+- Go 1.27.4 tests, coverage, and vet passed. Overall coverage was 90.8% after adding startup configuration statements. Arithmetic and HTTP package coverage remained 90.9% and 96.1%. Native Windows and Linux API builds passed. A direct run with `CALCULATOR_ADDR=127.0.0.1:18080` returned 3 for 1 + 2. The local React build passed. Updated the README and verification report.

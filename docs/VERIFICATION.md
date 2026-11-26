@@ -1,18 +1,22 @@
 # Assessment verification report
 
-Reviewed November 25, 2026. Scope covers the active FullstackCalculator working tree based on `41c6112`, including local frontend changes. The assessment requires the four basic operations, tests for both layers, and a coverage report. The reviewed scope also includes the optional power, square root, and percentage operations. [Assessment](ASSESSMENT.md) · [Functional specification](SPEC.md) · [UI specification](UI_SPEC.md)
+Verified locally on November 25, 2026 after applying the submission audit fixes. The assessment requires the four basic operations, tests for both layers, and a coverage report. The reviewed scope also includes the optional power, square root, and percentage operations. [Assessment](ASSESSMENT.md) · [Functional specification](SPEC.md) · [UI specification](UI_SPEC.md)
 
 ## Results
 
 | Check | Result |
 | --- | --- |
-| React tests, Node 24.22.2 on Windows | A clean `npm ci` from the lockfile succeeded. All 56 tests passed. Calculator code measured 89.07% statements, 85.54% branches, 90.90% functions, and 91.78% lines. The HTML report was generated at `frontend/coverage/index.html`. |
+| React tests, Node 24.22.2 on Windows | A clean `npm ci` from the lockfile succeeded. All 57 tests passed. Calculator code measured 89.04% statements, 85.81% branches, 91.11% functions, and 91.71% lines. Running coverage generates `frontend/coverage/index.html`. |
 | Frontend production build | TypeScript check and Vite build passed. |
-| Native Go 1.27.4 on Windows AMD64 | Both test packages passed. Coverage was 92.8% statements overall, 90.9% in arithmetic and 96.1% in HTTP. Vet and API build passed. |
-| Earlier native Go 1.25.0 run on Windows AMD64 | Arithmetic tests, vet, and API build passed. Windows Application Control blocked execution of the generated HTTP test executable, so this run produced no complete coverage result. |
-| Live Chromium smoke | All six scenarios passed against React and Go. They verified full-precision division used in a chain, ordinary and contextual division-by-zero recovery, marker persistence across modes, percentage of a value, mobile history focus, and keyboard/mouse tooltip behavior. |
+| Native Go 1.27.4 on Windows AMD64 | Both test packages passed. Coverage was 90.8% statements overall, 90.9% in arithmetic and 96.1% in HTTP. Vet and API build passed. |
+| Dependency and workflow checks | `govulncheck` found zero vulnerabilities on Go 1.27.4. The clean npm install reported zero advisories. `actionlint` passed. |
+| Live Chromium smoke | All seven scenarios passed against React and Go. They verified full-precision division used in a chain, ordinary and contextual division-by-zero recovery, marker persistence across modes, percentage of a value, mobile history focus, keyboard and mouse tooltip behavior, and visible Equals focus with only one request during repeated keyboard activation. |
 
 Earlier one-off Chromium checks verified that all digits of a 50-digit entry remain reachable by internal scrolling at 320 CSS px, that a touch hold shows help without setting an operator, and that an outside tap dismisses help. On the same emulated touch viewport with reduced motion enabled, a tap sent a real square-root request and displayed the result without animation. The result then fed a real power request using the `^` shortcut. Physical touch devices, screen-reader output, and macOS clipboard shortcuts remain outside this run.
+
+## Docker verification
+
+`docker compose config --quiet` passed. A full build and startup with `docker compose up --build -d --wait` reached healthy status for both services on Docker Desktop’s Linux engine. The host UI returned HTTP 200, `POST /api/calculate` through Nginx returned `{"result":40}` for 25 + 15, and inspection confirmed that Go had no host port mapping. All seven Chromium scenarios passed against `http://127.0.0.1:8088`. A direct Windows run also honored a custom `CALCULATOR_ADDR`. [Docker setup](../README.md#run-with-docker)
 
 ## What the suites establish
 
@@ -23,13 +27,13 @@ Earlier one-off Chromium checks verified that all digits of a 50-digit entry rem
 
 ## Remaining browser checks
 
-The React suite stubs `matchMedia` to match every query. The Chromium smoke covers the mobile drawer with forward Tab and Escape. A docked-to-modal history check and a screen-reader pass for results and errors remain useful manual checks. The arithmetic and HTTP suites already cover the assessment's core contracts.
+The React suite stubs `matchMedia` to match every query. The Chromium smoke covers the mobile drawer with forward Tab and Escape. A separate Chromium check exercised the dock-to-drawer transition when selecting Large. A screen-reader pass for results and errors remains open. The arithmetic and HTTP suites already cover the assessment's core contracts.
 
 ## GitHub Actions
 
-GitHub Actions runs separate Ubuntu jobs on pushes to `main` and on pull requests. The backend job reads Go 1.25.0 from `backend/go.mod`, runs uncached tests with module-wide coverage, vets all packages, and builds the API. The frontend job uses Node 24 and runs `npm ci`, `npm run coverage`, and `npm run build` from `frontend/`. Both jobs print coverage in their logs. The live browser smoke is a separate local check. [Workflow](../.github/workflows/backend.yml)
+GitHub Actions runs separate Ubuntu jobs on pushes to `main` and on pull requests. The backend job reads Go 1.27.4 from `backend/go.mod`, runs uncached tests with module-wide coverage, vets all packages, and builds the API. The frontend job uses Node 24 and runs `npm ci`, `npm run coverage`, and `npm run build` from `frontend/`. Both jobs print coverage in their logs. The live browser smoke is a separate local check. [Workflow](../.github/workflows/backend.yml)
 
-The earlier hosted baseline was independently confirmed in the GitHub job logs. Linux Go 1.25.0 reported 93.0% statements, and the test, vet, and build steps succeeded. That run predates the working tree covered by this report. The fresh backend figures in this report are from the native Windows Go 1.27.4 run. The updated workflow passed a local `actionlint` check, and the frontend commands passed from a clean Windows directory. The new frontend job has yet to run on GitHub-hosted Ubuntu. [Hosted baseline run](https://github.com/Ralet11/fullstack-calculator/actions/runs/45533516701)
+The earlier hosted backend baseline used Go 1.25.0. The results above are from the current local run on Go 1.27.4 and Node 24.22.2. The submission audit fixes have yet to run on GitHub-hosted Ubuntu. [Earlier hosted run](https://github.com/Ralet11/fullstack-calculator/actions/runs/45533516701)
 
 ## Reproduce
 

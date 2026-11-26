@@ -1,0 +1,6 @@
+.env
+.env.*
+coverage.out
+calculator-api
+*.exe
+*.test
