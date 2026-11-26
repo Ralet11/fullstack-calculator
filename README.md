@@ -43,6 +43,12 @@ Open the calculator at `http://127.0.0.1:8088`. Nginx serves the React build and
 
 Use `docker compose ps` to check readiness and `docker compose down` to stop the stack. To run the browser smoke test against Compose, install the test dependencies and Chromium as described below, then run `npm run test:smoke -- http://127.0.0.1:8088` from `frontend/`.
 
+## Live demo deployment
+
+The [live demo](https://calculator.prismadevs.com) runs on AWS EC2. Nginx serves the production React build over HTTPS and proxies `/api/` to the Go API on `127.0.0.1:8088`. The API runs as a dedicated systemd service.
+
+Releases are built before deployment and stored in versioned directories under `/opt/calculator/releases/`. Nginx serves the active release through `/opt/calculator/current`. The previous release is retained for rollback.
+
 ## API
 
 Send JSON to `POST /api/calculate`.
